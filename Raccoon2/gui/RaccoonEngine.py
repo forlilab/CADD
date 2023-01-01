@@ -1,17 +1,17 @@
-#       
+#
 #           AutoDock | Raccoon2
 #
 #       Copyright 2013, Stefano Forli
 #          Molecular Graphics Lab
-#  
-#     The Scripps Research Institute 
-#           _  
+#
+#     The Scripps Research Institute
+#           _
 #          (,)  T  h e
 #         _/
 #        (.)    S  c r i p p s
 #          \_
 #          (,)  R  e s e a r c h
-#         ./  
+#         ./
 #        ( )    I  n s t i t u t e
 #         '
 #
@@ -32,11 +32,11 @@
 #################################################################
 #
 # Hofstadter's Law: It always takes longer than you expect,
-#                   even when you take Hofstadter's Law 
+#                   even when you take Hofstadter's Law
 #                   into account.
 #
 #    The Guide is definitive. Reality is frequently inaccurate.
-#        Douglas Adams 
+#        Douglas Adams
 #
 #################################################################
 #
@@ -46,7 +46,7 @@
 # day_3:   Tuesday, February 14 2012
 # day_4:   Wednesday, February 15 2012
 # day_X:   Wednesday, February 22 2012  first working GPF generator
-# day_X+1: Friday, February 24 2012 first support for flex residues, 
+# day_X+1: Friday, February 24 2012 first support for flex residues,
 #                                   first totally successful updateStatus()
 #          Tuesday, February 29 2012      first complete cycle, 2 ligs, 2 Rec_rigid, 1 Rec_flex, GPF, DPF(sort of)
 #          Wednesday, March 1 2012      first complete running cycle 5K ligs, 2 Rec_rigid, 1 Rec_flex, GPF, DPF
@@ -62,6 +62,10 @@ from CADD.Raccoon2.HelperFunctionsN3P import *
 print "**** CORRECT REFERENCES TO HELPERFUNCTION ****"
 import shutil
 #import Tkinter.Photo
+import json
+from tempfile import mkstemp
+import zipfile
+from random import randint
 
 
 
@@ -98,7 +102,7 @@ class RaccoonEngine:
             else:
                 suggestion = "\n\nPlease install it, or try to run Raccoon with:\n\n $MGLROOT/bin/pythonsh raccoon.py"
             print error_title, error_msg, suggestion
-            exit(1)    
+            exit(1)
 
         self.hcovbond = 1.1
         self.acceptedFiles = ['pdbqt', 'pdb', 'mol2']
@@ -106,7 +110,7 @@ class RaccoonEngine:
         self.initLigData()
         self.initRecData()
         self.initLigFilters(mode=self.mode) # provide self.filterSettings
-        self.initCommonSettings() 
+        self.initCommonSettings()
         self.initAutoDockGpfSettings()
         self.initAutoDockDpfSettings()
         self.initVinaSettings()
@@ -125,7 +129,7 @@ class RaccoonEngine:
                              }
 
         self.status = { 'lig': False,          # variables for keeping
-                        'rec': False,          # track of Raccoon status 
+                        'rec': False,          # track of Raccoon status
                         'grid_box': False,     # and when the generation
                         'docking': False,      # is allowed
                         'directory': False}
@@ -144,7 +148,7 @@ class RaccoonEngine:
                                     'smooth' : 0.5,
                                     'map' : [],
                                     'dielectric': -0.1456,
-                                    'KEYWORD_ORDER' : [ 'npts', 'gridfld', 'spacing', 'receptor_types', 
+                                    'KEYWORD_ORDER' : [ 'npts', 'gridfld', 'spacing', 'receptor_types',
                                                         'ligand_types', 'receptor','gridcenter',
                                                         'smooth', 'map', 'dielectric'] }
         ## raccoon options
@@ -156,7 +160,7 @@ class RaccoonEngine:
         # binary to use for calculations
         self.autogrid_bin = None # will be initialized with a 'which'
         # map files per atom types
-        self.autogrid_maps = {} # { 'A': 'protein.A.map', 'C' : 'protein.C.map', 
+        self.autogrid_maps = {} # { 'A': 'protein.A.map', 'C' : 'protein.C.map',
 
 
     def initAutoDockDpfSettings(self):
@@ -189,8 +193,8 @@ class RaccoonEngine:
                    'map' : [],
                    'move' : '',
                    'flexres' : '',
-                   'about' : [0.0, 0.0, 0.0], 
-                   'KEYWORD_ORDER' : [ 'ligand_types', 'map', 
+                   'about' : [0.0, 0.0, 0.0],
+                   'KEYWORD_ORDER' : [ 'ligand_types', 'map',
                         'fld', 'elecmap', 'desolvmap', 'move', 'flexres', 'about'],
                    'OPTIONAL' : []
             },
@@ -207,8 +211,8 @@ class RaccoonEngine:
             'ga_cauchy_alpha': 0.0,
             'ga_cauchy_beta': 1.0,
             'set_ga'    : '',
-            'KEYWORD_ORDER':['ga_pop_size','ga_num_evals', 
-                             'ga_num_generations', 'ga_elitism', 
+            'KEYWORD_ORDER':['ga_pop_size','ga_num_evals',
+                             'ga_num_generations', 'ga_elitism',
                              'ga_mutation_rate', 'ga_crossover_rate',
                              'ga_window_size', 'ga_cauchy_alpha',
                              'ga_cauchy_beta', 'set_ga'],
@@ -235,7 +239,7 @@ class RaccoonEngine:
                },
 
         # local search settings
-        'ls' : { 
+        'ls' : {
             'ga_pop_size' : 150,
             'sw_max_its': 300,
             'sw_max_succ' : 4,
@@ -245,7 +249,7 @@ class RaccoonEngine:
             'ls_search_freq': 0.06,
             'set_psw1' : '',
             'KEYWORD_ORDER' : [ 'ga_pop_size', 'sw_max_its', 'sw_max_succ', 'sw_max_fail',
-                               'sw_rho', 'sw_lb_rho', 'ls_search_freq', 
+                               'sw_rho', 'sw_lb_rho', 'ls_search_freq',
                                'set_psw1'],
             },
 
@@ -261,7 +265,7 @@ class RaccoonEngine:
                 # ACTIVATION ORDER: generic, ls, ga, clustering
 
             } # end autodocking settings
-    
+
         # XXX unbound energies... calculate?
         #  LS = (ga_pop_size + ls_block + do_local_only XX + analysis )
         # LGA = (ga_block + ls_block + ga_run XX + analysis)
@@ -269,7 +273,7 @@ class RaccoonEngine:
 
     def initVinaSettings(self):
         # vina data
-        self.vina_settings = { 
+        self.vina_settings = {
                'center_x': 0.0,
                'center_y': 0.0,
                'center_z': 0.0,
@@ -287,29 +291,29 @@ class RaccoonEngine:
                                   'exhaustiveness', 'cpu', 'out', 'log',
                                   'num_modes', 'energy_range',
                                 ],
-               'OPTIONAL' : {'out': False, 'log' : False, 'num_modes' : False, 'energy_range': False }, 
+               'OPTIONAL' : {'out': False, 'log' : False, 'num_modes' : False, 'energy_range': False },
         }
 
 
     def initSystemOptions(self):
-        """ initialize general options 'self.generalOpts', used 
+        """ initialize general options 'self.generalOpts', used
             during the generation of the jobs
         """
 
-        self.generalOpts = { 
+        self.generalOpts = {
            'generic': {  'computing'            : 'workstation', # workstation, linux_cluster
                          'platform'             : 'current', # current (sys.platform), 'posix', 'windows', 'cygwin'
                          'split'                : 1000,  # None, 10, 100, 1000, 10K 100K
                          'script'               : 'master', # master, single, off
                          'package'              : 'off', # tar, targz, tarbz2, zip, off
                          'delete_maps'          : True, # true/false
-                         'out_file_per_ligand'  : 1,  # 1  
+                         'out_file_per_ligand'  : 1,  # 1
                          'cpu_per_job'          : 1,  # 1, 2, 3
                       },
 
            'scheduler': 'pbs', # currently, only 'pbs'; FUTURE: sungrid, opal ...?
 
-           'scheduler_pbs': { 
+           'scheduler_pbs': {
                          'cput'        : '24:00:00',
                          'walltime'    : '24:00:00',
                          'nodes'       : 1,
@@ -339,7 +343,7 @@ class RaccoonEngine:
             current_default = False
         self.initLigFilters(mode=mode)
 
-        if current_default: 
+        if current_default:
             self.filterSettings = self.FILTER_DEF.copy()
         # XXX incomplete... XXX
 
@@ -359,12 +363,12 @@ class RaccoonEngine:
         except:
             if self.debug:
                 print "setBoxCenter> ERROR in setting coords(%s) : %s" % (coord, exc_info()[1]  )
-            return False 
-            
+            return False
+
 
     def setBoxSize(self, size):
         """ accepts a vector with three dimensions (A)
-            numbers are adapted later on to be points 
+            numbers are adapted later on to be points
             (AD) or actual angstroms (VINA)
         """
         try:
@@ -404,11 +408,11 @@ class RaccoonEngine:
                     os.makedirs(dir_path)
                 except:
                     # XXX add here all teh tests.. /dev/null dev/full
-                    if self.debug: print "setOutputDir> ERROR impossible to create dir (%s): %s" % (dir_path, exc_info()[1])  
+                    if self.debug: print "setOutputDir> ERROR impossible to create dir (%s): %s" % (dir_path, exc_info()[1])
                     return (False, ('error creating dir %s: %s' % (dir_path, exc_info()[1]) ) )
 
             # check if dir is empty
-            if checkEmpty and not os.listdir(dir_path) == []: 
+            if checkEmpty and not os.listdir(dir_path) == []:
                 if self.debug: print "setOutputDir> ERROR directory not empty (%s) (checkEmpty:True)" % dir_path
                 return (False, 'not empty')
 
@@ -436,7 +440,7 @@ class RaccoonEngine:
         # AutoDock atom type list and their count (updated with ligands imported)
         ## Warning: atomic weights are inaccurate and there is no account for merged non-polar H's
         self.defaultAtWeight = 12 # default atomic weight for unknown atype
-            
+
 
         self.atypelist = {   # count  MW
                     'H'      : [ 0,  1    ],
@@ -609,9 +613,9 @@ class RaccoonEngine:
 
         self.filterSettings = setting.copy() # initialize the current filter settings with the default Raccoon
 
-        
 
-            
+
+
     #def ligands(self, atLeastOne=False):
     def ligands(self, atLeastOne=False):
         """ return accepted ligands """
@@ -645,8 +649,8 @@ class RaccoonEngine:
         return self.LigBook.keys()
 
     def currentLigAtypes(self):
-        """ 
-            return atom types employed in the 
+        """
+            return atom types employed in the
             current session (accepted ligands
         """
         atypes = []
@@ -665,7 +669,7 @@ class RaccoonEngine:
             for r in rec_list:
                 del self.RecBook[r]
         self.updateStatus()
- 
+
     def removeLigands(self, lig_list=None):
         """ remove requested ligands from the Great Book of Ligands
         """
@@ -712,20 +716,20 @@ class RaccoonEngine:
         if not self.output_dir['path'] == None:
             if not self.output_dir['used']:
                 if self.output_dir['freespace'] > 0: # XXX useless placeholder /to be improved
-                    valid_path = True    
+                    valid_path = True
         self.status['directory'] = valid_path
         # FINAL STATUS
-        final_status = (self.status['lig'] and 
-                self.status['rec'] and 
-                self.status['grid_box'] and 
-                self.status['docking'] and 
+        final_status = (self.status['lig'] and
+                self.status['rec'] and
+                self.status['grid_box'] and
+                self.status['docking'] and
                 self.status['directory'] )
 
         if report: # or self.debug:
             print "\nupdateStatus>"
             for i in sorted(self.status.keys()):
                 print "\t[   %s\t]\t %s" %(self.status[i], i)
-            print '\t---------------------\n\t  FINAL  :\t %s' % final_status 
+            print '\t---------------------\n\t  FINAL  :\t %s' % final_status
         return final_status
 
     def generateLigPdbqt(self, filelist, GUIcallback=None):
@@ -735,7 +739,7 @@ class RaccoonEngine:
 
 
     def checkPdbqt(self, fname):
-        """ 
+        """
             check if the file is a valid AutoDock(Vina) file (mode):
                 - 'lig' : formatted ligand file
                 - 'rec' : target structure file
@@ -769,13 +773,13 @@ class RaccoonEngine:
                     # if no keywords have been found so far
                     # a PDBQT can be only a rec file
                     break
-        except: 
+        except:
             _type = 'error'
             error = 'file_error [%s]: %s' % (fname, exc_info()[1] )
         return {'type': _type, 'error' : error}
 
     def checkPdbqtList(self, filelist):
-        """ 
+        """
             check if the file is a valid AutoDock(Vina) file (mode):
                 - 'lig' : formatted ligand file
                 - 'rec' : target structure file
@@ -812,18 +816,18 @@ class RaccoonEngine:
                         # if no keywords have been found so far
                         # a PDBQT can be only a rec file
                         break
-            except: 
+            except:
                 found = 'file_error [%s]: %s' % (f, exc_info()[1] )
                 error.append([f, found])
-        return {'lig' : lig, 'rec': rec, 'flex':flex, 'result': result, 'error': error}        
+        return {'lig' : lig, 'rec': rec, 'flex':flex, 'result': result, 'error': error}
 
     def addLigandList(self, filelist, prefilter=False, GUI = None, stopcheck = None, showpercent=None):
-        """ accept a list of files to be registered in the 
+        """ accept a list of files to be registered in the
             Great Book of Ligands
-            
-            prefilter (true,false) : if true, ligands not 
-                                     satisfying filtering criteria 
-                                     would not be imported in the session 
+
+            prefilter (true,false) : if true, ligands not
+                                     satisfying filtering criteria
+                                     would not be imported in the session
             return a dictionary:
                 'accepted' : accepted
                 'duplicate': already present
@@ -844,7 +848,7 @@ class RaccoonEngine:
             error = report['error']
             if _type == 'lig': # valid ligand PDBQT
                 response = self.addLigand(f, prefilter=prefilter, skipupdate=True)
-                #   n {'accepted': is_wanted, 'reason': reason}  
+                #   n {'accepted': is_wanted, 'reason': reason}
                 if response['accepted']:
                     accepted.append((f, response['name']))
                 else:
@@ -874,15 +878,15 @@ class RaccoonEngine:
         return {'accepted': accepted, 'rejected': rejected }
 
     def addLigand(self, ligand, prefilter=False, skipupdate=False):
-        """ accept a ligand fileto be registered in the 
+        """ accept a ligand fileto be registered in the
             Great Book of Ligands
-            
-            prefilter (true,false) : if true, ligands not 
-                                     satisfying filtering criteria 
-                                     would not be imported in the session 
+
+            prefilter (true,false) : if true, ligands not
+                                     satisfying filtering criteria
+                                     would not be imported in the session
 
             report the exit status of the ligand registration {accepted:10, rejected :'reason'}
-        """ 
+        """
         lig_data = self.extractLigProperties(ligand)
         if not lig_data['success']:
             return { 'accepted': False, 'reason': lig_data['reason'] }
@@ -922,7 +926,7 @@ class RaccoonEngine:
                             is_wanted = False
                             reason = 'too many name guessing attempts: %s' % suggest
                             break
-                    if is_wanted: 
+                    if is_wanted:
                         name = suggest
                         reason = 'homonimy avoided'
                         #print ": found suggested name:",suggest
@@ -936,9 +940,9 @@ class RaccoonEngine:
             self.registerLigand(action='add', **lig_data)
         if not skipupdate:
             self.updateStatus()
-        return {'accepted': is_wanted, 'reason': reason, 'name': name} 
+        return {'accepted': is_wanted, 'reason': reason, 'name': name}
 
-    def addReceptorList(self, receptor_files=None, receptor_flex_pairs_list=None): 
+    def addReceptorList(self, receptor_files=None, receptor_flex_pairs_list=None):
         """ accept a list of PDBQT to be included in receptor's list
             - scan the list
             - reject ligs
@@ -975,7 +979,7 @@ class RaccoonEngine:
         self.updateStatus()
         #print "addReceptorList> ACCEPTED", accepted
         return {'accepted': accepted, 'rejected': rejected}
-    
+
     def findRecFlexPairs(self, mode='name', **files):
         """ from a dictionary of files (generated with checkPdbqtList)
             try to identify if there are rec+flex pairs
@@ -984,11 +988,11 @@ class RaccoonEngine:
             - mode 'coord' ( 'CA' connected with two atoms)
 
             WARNING: if '*_rigid.pdbqt' and '*_flex.pdbqt'
-                     are generated there is no guarantee 
+                     are generated there is no guarantee
                      of actual correspondence between the two!
 
                     Raccoon generation should avoid this problems:
-                        
+
                         1jff.pdbqt -> (B:THR276) -> 1jff_B-THR276_rigid.pdbqt
                                                     1jff_B-THR276_flex.pdbqt
 
@@ -1045,7 +1049,7 @@ class RaccoonEngine:
                         is_wanted = False
                         reason = 'no available name up to %s' % suggest
                         break
-                if is_wanted: 
+                if is_wanted:
                     #print ": found suggested name:",suggest
                     rec_data['name'] = suggest
                     name = suggest
@@ -1071,7 +1075,7 @@ class RaccoonEngine:
             rec_data['is_flexible'] = True
             # C:THR276 -> C-THR276
             flex_names = [ i.replace(":","-") for i in sorted(flex_res_data['residues']) ]
-            rec_data['name'] += "_"+"_".join(flex_names) 
+            rec_data['name'] += "_"+"_".join(flex_names)
         return rec_data
 
 
@@ -1108,7 +1112,7 @@ class RaccoonEngine:
             res = rec_structure[c]
             for r in res:
                 res_list.append( ("%s:%s" % (c.strip(),r)) )
-        for a in atoms:          
+        for a in atoms:
             at = getAtype(a)
             if at in self.atypelistRec:
                 if not at in rec_types:
@@ -1118,16 +1122,16 @@ class RaccoonEngine:
         return {'name': name,
                 'atypes':rec_types,
                 'atypes_unknown': rec_types_unk,
-                'structure': rec_structure, 
+                'structure': rec_structure,
                 'chains' : chains,
                 'residues': res_list,
                 'filename': filename}
 
     def registerLigand(self, action='add', **lig_data):
         """ register the ligand in the Great Book of Ligands
-            action can be 'add' or 'del' 
-        
-            TODO: include different registration methods, 
+            action can be 'add' or 'del'
+
+            TODO: include different registration methods,
                    i.e. Sqlite3, remote Opal...
         """
         name = lig_data['name']
@@ -1175,7 +1179,7 @@ class RaccoonEngine:
             self.updateAtomPoolLigUnk(action=action, **lig_data)
 
     def updateAtomPoolLigUnk(self, action='add', **lig_data):
-        """ update the count of the unknown atom types and the list of 
+        """ update the count of the unknown atom types and the list of
             ligand filenames containing them
         """
         name = lig_data['name']
@@ -1234,8 +1238,8 @@ class RaccoonEngine:
                 if dist(h,c,sq=1) < self.hcovbond:
                     hbd+=1
                     break
-        return {'name'   : name, 'tors'   : tors, 
-                'hba'    : hba,  'hbd'    : hbd, 
+        return {'name'   : name, 'tors'   : tors,
+                'hba'    : hba,  'hbd'    : hbd,
                 'mw'     : mw,   'nat'    : heavy,
                 'atypes' : atype_list,
                 'atypes_unknown' : unknown_type,
@@ -1244,7 +1248,7 @@ class RaccoonEngine:
 
     def filterLigands(self,lig_list=None, previewOnly=False):
         """ filter a list of ligands
-            if the list is not provided, all ligands 
+            if the list is not provided, all ligands
             in the current session will be filtered
 
             if previewOnly, only the count of ligands passing
@@ -1297,10 +1301,10 @@ class RaccoonEngine:
         except:
             print "ligToBox> ERROR reading ligand [%s] : [%s]" % (ligand, exc_info()[1])
             return False
-            
+
 
     def importGpfTemplate(self, gpf):
-        """read a GPF file template to set values in the 
+        """read a GPF file template to set values in the
            grid box of current session
         """
         try:
@@ -1318,7 +1322,7 @@ class RaccoonEngine:
 
 
     def importDpfTemplate(self, dpf):
-        """read a DPF file template to set values in the 
+        """read a DPF file template to set values in the
            parmeter search
         """
         # XXX INCOMPLETE NOT WORKING!!
@@ -1350,7 +1354,7 @@ class RaccoonEngine:
     def gridBoxFromConf(self, conf):
         """set the grid box from a Vina config file
            vina conf files don't contain any mandatory parameter,
-           therefore a check is provided for missing values 
+           therefore a check is provided for missing values
 
         """
         # XXX TODO this should change also other keyword settings!
@@ -1397,13 +1401,13 @@ class RaccoonEngine:
 
     def gridBoxFromLigand(self, ligand, tolerance=5):
         """
-        used to set grid center and size by using a ligand pdb/qt or 
+        used to set grid center and size by using a ligand pdb/qt or
         an AutoLigand output
         a tolerance can be added (Angstrom)
         """
         try:
             #ligand_lines = getLines(ligand)
-    
+
             self.ligToBox(ligand, tolerance=tolerance)
 
             self.ligBox['file'] = ligand
@@ -1411,9 +1415,9 @@ class RaccoonEngine:
             size = [ self.ligBox['x'][1] -  self.ligBox['x'][0],
                      self.ligBox['y'][1] -  self.ligBox['y'][0],
                      self.ligBox['z'][1] -  self.ligBox['z'][0] ]
-    
+
             self.setBoxSize( size )
-            self.setBoxCenter( self.ligBox['center'] ) 
+            self.setBoxCenter( self.ligBox['center'] )
         except:
             print "gridBoxFromLigand> ERROR reading ligand [%s] : %s" % (ligand, exc_info()[1])
             return False
@@ -1425,7 +1429,7 @@ class RaccoonEngine:
         """
         accepted = [ 'exhaustiveness', 'num_modes', 'energy_range' ]
 
-        for k in accepted:    
+        for k in accepted:
             if k in conf_data.keys():
                 self.vina_settings[k] = conf_data[k]
 
@@ -1443,7 +1447,7 @@ class RaccoonEngine:
         def generic_settings():
             # generic settings
             source = current_dpf_settings['generic']
-            dpf.append( 'autodock_parameter_version %s' % 
+            dpf.append( 'autodock_parameter_version %s' %
                         source['autodock_parameter_version'] )
             if not source['parameter_file'] == None:
                 parfile = os.path.basename( source['parameter_file'] )
@@ -1471,7 +1475,7 @@ class RaccoonEngine:
             dpf.append( 'move %s' % lig_file )
             if self.RecBook[receptor]['is_flexible']: # in self.RecBook[receptor].keys():
                 dpf.append( 'flexres %s' % (os.path.basename(self.RecBook[receptor]['flex_res_file'])))
-            dpf.append( 'about %2.3f %2.3f %2.3f' % tuple(about) )    
+            dpf.append( 'about %2.3f %2.3f %2.3f' % tuple(about) )
 
         def ga_settings():
             source =  current_dpf_settings['ga']
@@ -1510,7 +1514,7 @@ class RaccoonEngine:
                                  }
             sm = current_dpf_settings['search_mode']
             dpf.append( starting_keyword[sm] % runs )
-             
+
         def clustering_settings():
             source = current_dpf_settings['clustering']
             for k in source['KEYWORD_ORDER']:
@@ -1523,7 +1527,7 @@ class RaccoonEngine:
         if settings == 'template':
             current_dpf_settings = self.autodock_parameters.copy()
         elif settings == 'auto':
-            settings = self.dpfComplexityEstimator(lig = lig, 
+            settings = self.dpfComplexityEstimator(lig = lig,
                 rec = rec, grid = self.autodock_parameters['complexity_map'])
         # total runs
         runs = current_dpf_settings['runs']
@@ -1581,7 +1585,7 @@ class RaccoonEngine:
         current_gpf['receptor'] = os.path.basename( self.RecBook[receptor]['filename'] )
 
         rec_name = os.path.splitext(current_gpf['receptor'])[0]
-            
+
         gpf_file = []
         for k in self.autogrid_parameters['KEYWORD_ORDER']:
         # XXX BUG HERE! missing parameter file code!
@@ -1603,7 +1607,7 @@ class RaccoonEngine:
                 line = "%s %s" % (k, current_gpf[k])
                 gpf_file.append(line)
         return gpf_file
-        
+
 
     def VinaGenConf(self, ligand=None, receptor=None, raw=False):
         """
@@ -1665,7 +1669,7 @@ class RaccoonEngine:
         # create REC dir
         #   - (A) copy rec file
         #   - (B) calculate grid maps ( + parm file )
-        
+
         # create LIG dir ( + split_number )
         #   - copy lig file
         #   - copy flex file
@@ -1675,7 +1679,7 @@ class RaccoonEngine:
         #   - create single_job script
 
         # create master script
-        # 
+        #
         # create package
         #
         #
@@ -1683,7 +1687,7 @@ class RaccoonEngine:
         # ---------------------
         #
         # current_dir = OUTPUT_DIR
-        # 
+        #
         #   for r in rec:
         #
         #       rec_dir = OUTPUT_DIR + REC
@@ -1703,15 +1707,15 @@ class RaccoonEngine:
         # naming section
         cached_maps_dir_name = 'maps'
         gpf_suffix = '_all_maps.gpf'
-  
+
         #self.autogrid_mode = 'always' # 'now' or 'never' (C) 1960 Elvis
 
         print "TheFunction> start"
         # XXX Numbering voodoo for percentages:
         # tot = rec# * lig# ?
         #       count autogrid step?
-        # XXX 
-        for rec in receptors: # XXX receptor loop XXX 
+        # XXX
+        for rec in receptors: # XXX receptor loop XXX
             self._recdir = self.makeDir(self.output_dir['path'], rec)
             self._current_rec = rec
             if not self._recdir:
@@ -1734,7 +1738,7 @@ class RaccoonEngine:
                         print self._map_dir, lig_types
                         self.copyCacheMaps(target=self._map_dir, lig_types=lig_types, file_policy ='copy')
             self.LIGAND_COUNTER = 0
-            for lig in ligands: # 
+            for lig in ligands: #
                 self._current_lig = lig # XXX possibly useless
                 self._curr_lig_dir = self.makeLigDir(lig)
                 # copy receptor rigid+flex
@@ -1757,7 +1761,7 @@ class RaccoonEngine:
                 # XXX store the lig_dir for the job script
                 self.LIGAND_COUNTER += 1
 
-            # XXX update the master-job list status 
+            # XXX update the master-job list status
             # and generate the actual script here
 
 
@@ -1770,7 +1774,7 @@ class RaccoonEngine:
             conf_filename = path + os.sep + fname
         writeList( conf_filename, conf, addNewLine=True)
         return conf_filename
-        
+
 
     #def provideMapData(self, lig, rec=None):
     #    """handle the grid data issue,
@@ -1779,18 +1783,18 @@ class RaccoonEngine:
     #    self._current_lig # current lig processed
 
     def calculateCacheMaps(self, mapdir, rec, lig_types):
-        """ run AutoGrid n the to calculate grid maps on the atom 
+        """ run AutoGrid n the to calculate grid maps on the atom
             types requested for chaching
         """
-        # prepare the AutoGrid calculation 
+        # prepare the AutoGrid calculation
         gpf = self.prepareCacheMapCalc(path=mapdir, rec=rec, lig_types=lig_types)
         # run AutoGrid at the specified path
         self.runAutoGrid(path, gpf)
-        # self.autogrid_maps = {} # { 'A': 'protein.A.map', 'C' : 'protein.C.map', 
+        # self.autogrid_maps = {} # { 'A': 'protein.A.map', 'C' : 'protein.C.map',
         return True
 
 
-    def prepareCacheMapCalc(self, path, rec, lig_types): 
+    def prepareCacheMapCalc(self, path, rec, lig_types):
         """ generate the calculation for caching map files
             - copy receptor files ( + flex )
             - generate GPF for all requested ligand types
@@ -1815,24 +1819,24 @@ class RaccoonEngine:
         gpf_filename = path + os.sep + rec + '.gpf'
         writeList( gpf_filename, gpf, addNewLine=True)
         return gpf_filename
-        
-    
+
+
     def prepareLigDpf(self,path, rec, lig, settings=None):
         """generate DPF for the lig/rec combination
 
             'settings' is an option to specify if the DPF will
             be generated:
 
-              - 'template' : by using the same settings template 
+              - 'template' : by using the same settings template
                              for every ligand
 
               - 'auto'     : by adapting the search parameters
                              to the bindig volume and the ligand
         """
-        if settings == None and self.autodock_parameters['dpf_mode'] == None:  
+        if settings == None and self.autodock_parameters['dpf_mode'] == None:
             settings = None
         elif settings == 'auto':
-            settings = self.dpfComplexityEstimator(lig = lig, 
+            settings = self.dpfComplexityEstimator(lig = lig,
                 rec = rec, grid = self.autodock_parameters['complexity_map'])
 
         dpf = self.AutoDockMakeDpf(receptor=rec, ligand=lig, settings = None)
@@ -1841,7 +1845,7 @@ class RaccoonEngine:
         dpf_filename = dpf_filename % (lig, rec)
         writeList( dpf_filename, dpf, addNewLine=True)
         return dpf_filename
-        
+
 
     def dpfComplexityEstimator(self, lig, rec, grid=None):
         """ estimate the complexity of the search by analyzing
@@ -1849,10 +1853,10 @@ class RaccoonEngine:
             (+ flex_res, if defined )
         """
         if grid == None:
-            grid = self.autodock_parameters['complexity_map'] 
+            grid = self.autodock_parameters['complexity_map']
         # XXX not working yet...
         return self.autodock_parameters.copy()
-        
+
 
 
     def copyAdParmFile(self, path, filename):
@@ -1879,11 +1883,11 @@ class RaccoonEngine:
     def copyCacheMaps(self, target, lig_types = [], file_policy = 'copy'):
         """ copy cache map files in place
             'mode' can be 'copy' or 'link'
-            
-            this function can be used to copy map files in 
+
+            this function can be used to copy map files in
             ligand directories or on cached_map directories
         """
-        # self.autogrid_maps = {} # { 'A': 'protein.A.map', 'C' : 'protein.C.map', 
+        # self.autogrid_maps = {} # { 'A': 'protein.A.map', 'C' : 'protein.C.map',
         if file_policy == 'copy':
             copy_func = shutil.copy2
         elif file_policy == 'link':
@@ -1897,7 +1901,7 @@ class RaccoonEngine:
         """ copy receptor file and flex_res, if specified
             in the directory specified
         """
-        try: 
+        try:
             shutil.copy2( self.RecBook[rec]['filename'], target_dir)
             reason = 'rigid'
             if self.RecBook[rec]['is_flexible']:
@@ -1912,7 +1916,7 @@ class RaccoonEngine:
         """ copy ligand file and flex_res, if specified,
             in the directory specified
         """
-        try: 
+        try:
             shutil.copy2( self.LigBook[lig]['filename'], target_dir)
             reason = 'ligand'
             #if self.RecBook[self._current_rec]['is_flexible']:
@@ -1923,7 +1927,7 @@ class RaccoonEngine:
             error = "%s" % exc_info()[1]
             return { 'success': False, 'reason': error }
 
-        
+
 
 
     def makeDir(self, path, name):
@@ -1941,7 +1945,7 @@ class RaccoonEngine:
 
 
     def makeLigDir(self, ligand):
-        """create the ligand directory, adding 
+        """create the ligand directory, adding
            the splitting suffix, if necessary
         """
         if not self.generalOpts['generic']['split'] == None:
@@ -1958,16 +1962,81 @@ class RaccoonEngine:
             os.makedirs(dir_name)
         except:
             print "problem: %s" % exc_info()[1]
-            return False    
+            return False
         return dir_name
 
+
+    def generateBoincTaskJson(self, receptor, ligand, dockengine, config):
+        """generate a json file for the boinc task"""
+        document = {}
+
+        if dockengine == 'vina':
+            document['scoring'] = 'vina'
+        elif dockengine == 'autodock':
+            print "%s docking engine is currently not supported by BOINC" % dockengine
+            return None
+        else:
+            print "Unknown docking engine: %s" % dockengine
+            return None
+
+        rec_data = self.RecBook[receptor]
+        lig_data = self.LigBook[ligand]
+
+        document['receptor'] = os.path.basename(rec_data['filename'])
+        document['ligand'] = os.path.basename(lig_data['filename'])
+
+        if self.gridBox()['center'] is None:
+            print "ERROR: no grid box center defined"
+            return None
+
+        if self.gridBox()['center'][0] is not None:
+            document['center_x'] = self.gridBox()['center'][0]
+        if self.gridBox()['center'][1] is not None:
+            document['center_y'] = self.gridBox()['center'][1]
+        if self.gridBox()['center'][2] is not None:
+            document['center_z'] = self.gridBox()['center'][2]
+
+        if self.gridBox()['size'] is None:
+            print "ERROR: no grid box size defined"
+            return None
+        if self.gridBox()['size'][0] is not None:
+            document['size_x'] = self.gridBox()['size'][0]
+        if self.gridBox()['size'][1] is not None:
+            document['size_y'] = self.gridBox()['size'][1]
+        if self.gridBox()['size'][2] is not None:
+            document['size_z'] = self.gridBox()['size'][2]
+
+        vina_search_parameters = config.getSearchParmVina()
+        if vina_search_parameters:
+            if vina_search_parameters['exhaustiveness'] is not None:
+                document['exhaustiveness'] = vina_search_parameters['exhaustiveness']
+            if vina_search_parameters['num.modes'] is not None:
+                document['num_modes'] = vina_search_parameters['num.modes']
+            if vina_search_parameters['energyrange'] is not None:
+                document['energy_range'] = vina_search_parameters['energyrange']
+
+        document['seed'] = randint(-2147483648, 2147483647)
+        document['out'] = '%s_%s_out.pdbqt' % (rec_data['name'], lig_data['name'])
+        json_document = json.JSONEncoder().encode(document)
+        return json_document
+
+    def generateBoincTaskZip(self, receptor, ligand, json_document):
+        """generate a zip file for the boinc task"""
+        zip_file_handle, zip_file_path = mkstemp()
+        os.close(zip_file_handle)
+        zip_file = zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED)
+        zip_file.write(self.RecBook[receptor]['filename'], os.path.basename(self.RecBook[receptor]['filename']))
+        zip_file.write(self.LigBook[ligand]['filename'], os.path.basename(self.LigBook[ligand]['filename']))
+        zip_file.writestr('task.json', json_document)
+        zip_file.close()
+        return zip_file_path
 
 if __name__ == '__main__':
 
 
     from sys import argv
 
-    # -g  gpf_template_file 
+    # -g  gpf_template_file
     # -c  config_file
     # -d  dpf_template_file
     # -r  receptor.pdbqt
@@ -2019,7 +2088,7 @@ if __name__ == '__main__':
 
 
     ##################################################################
-    # TESTING 
+    # TESTING
 
     raccoon = Raccoon(debug=True)
     # adding a ligand list
@@ -2036,7 +2105,7 @@ if __name__ == '__main__':
         rec = raccoon.RecBook[r]
         if 'flex_res' in rec.keys():
             flex = " %s : %s types(%s)" % (",".join(rec['flex_res']),
-                 rec['flex_res_file'], ",".join(rec['flex_atypes'])) 
+                 rec['flex_res_file'], ",".join(rec['flex_atypes']))
         else:
             flex = 'None'
         print "\t%s : rigid[%s] \t flex[%s]" % (r,
@@ -2063,7 +2132,7 @@ if __name__ == '__main__':
     # setting custom filter settings
     custom_filter_set = raccoon.filterSettings.copy()
     custom_filter_set['hba'][0] = 28
-    custom_filter_set['hbd'][1] = 76  
+    custom_filter_set['hbd'][1] = 76
     custom_filter_set['title'] = 'TESTING'
     raccoon.setFilterSet(customFilter=custom_filter_set)
     print "\n- current filter set", raccoon.filterSettings
@@ -2082,7 +2151,7 @@ if __name__ == '__main__':
     # setting default filter settings (lipinsky)
     raccoon.setFilterSet(filterSet = 'lipinsky')
     print "\n- current filter set ", raccoon.filterSettings
-    
+
     # perform the filter with the current settings
     raccoon.filterLigands()
     print "- filtering with '%s'" % (raccoon.filterSettings['title'])
@@ -2112,7 +2181,7 @@ if __name__ == '__main__':
         print "\tcenter (%02.3f, %02.3f, %02.3f)" % (raccoon.box_center[0],
                     raccoon.box_center[1], raccoon.box_center[2] )
         print "\tsize   (%02.3f, %02.3f, %02.3f)" % (raccoon.box_size[0],
-                    raccoon.box_size[1], raccoon.box_size[2] ) 
+                    raccoon.box_size[1], raccoon.box_size[2] )
 
     elif gpf_source == 'al':
         # use AutoLigand result to set center and size"
@@ -2122,7 +2191,7 @@ if __name__ == '__main__':
         print "\tcenter (%02.3f, %02.3f, %02.3f)" % (raccoon.box_center[0],
                     raccoon.box_center[1], raccoon.box_center[2] )
         print "\tsize   (%02.3f, %02.3f, %02.3f)" % (raccoon.box_size[0],
-                    raccoon.box_size[1], raccoon.box_size[2] ) 
+                    raccoon.box_size[1], raccoon.box_size[2] )
 
     elif gpf_source == 'conf':
         print '\n- setting center with config file (%s)' % conf_template
@@ -2131,8 +2200,8 @@ if __name__ == '__main__':
         print "\tcenter (%02.3f, %02.3f, %02.3f)" % (raccoon.box_center[0],
                     raccoon.box_center[1], raccoon.box_center[2] )
         print "\tsize   (%02.3f, %02.3f, %02.3f)" % (raccoon.box_size[0],
-                    raccoon.box_size[1], raccoon.box_size[2] ) 
-        
+                    raccoon.box_size[1], raccoon.box_size[2] )
+
 
 
     # generate GPF for ligands/rec combinations
@@ -2143,7 +2212,7 @@ if __name__ == '__main__':
     elif test =='vina':
         raccoon.setMode('vina')
 
-    print 
+    print
     raccoon.TheFunction()
     exit()
 
@@ -2162,7 +2231,7 @@ if __name__ == '__main__':
             outname = "%s_%s.gpf" % (l, r)
             outname = raccoon.output_dir['path']+os.sep+outname
             writeList(outname, gpf, addNewLine=True)
-    
+
             dpf=raccoon.AutoDockMakeDpf(ligand=l, receptor=r)
             outname = "%s_%s.dpf" % (l, r)
             outname = raccoon.output_dir['path']+os.sep+outname
@@ -2172,7 +2241,7 @@ if __name__ == '__main__':
             outname = "%s_%s.conf" % (l, r)
             outname = raccoon.output_dir['path']+os.sep+outname
             writeList(outname, conf, addNewLine=True)
-            
+
 
     if test == 'autodock':
         # gpf

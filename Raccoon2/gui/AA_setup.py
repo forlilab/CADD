@@ -1,17 +1,17 @@
-#       
+#
 #           AutoDock | Raccoon2
 #
 #       Copyright 2013, Stefano Forli
 #          Molecular Graphics Lab
-#  
-#     The Scripps Research Institute 
-#           _  
+#
+#     The Scripps Research Institute
+#           _
 #          (,)  T  h e
 #         _/
 #        (.)    S  c r i p p s
 #          \_
 #          (,)  R  e s e a r c h
-#         ./  
+#         ./
 #        ( )    I  n s t i t u t e
 #         '
 #
@@ -45,6 +45,8 @@ import tkMessageBox as tmb
 import tkFileDialog as tfd
 import platform
 import paramiko as pmk
+import webbrowser
+import CADD.Raccoon2.BoincClient as BoincClient
 try:
     from multiprocessing import cpu_count
 except:
@@ -62,7 +64,7 @@ from mglutil.util.callback import CallbackFunction # as cb
 
 
 class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
-    
+
     def __init__(self, app, parent, debug=False): # Initialize to the default resource
         rb.TabBase.__init__(self, app, parent, debug = False)
         rb.RaccoonDefaultWidget.__init__(self, parent)
@@ -129,6 +131,11 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.b3.pack(side='left')
         self.b3.configure(width=128, state='disabled')
 
+        self.b4 = tk.Radiobutton(frame, text='   BOINC\n   network', variable=self._res_var, image = self._ICON_boinc,
+            compound='left', value='boinc', command=self.setResource_cb, indicatoron=False, **self.BORDER)
+        self.b4.pack(side='left')
+        self.b4.configure(width=128)
+
         frame.pack(side='top', expand=0, anchor='n')
         group.pack(fill='none',expand=0,anchor='center',side='top',padx=5, pady=5, ipadx=5,ipady=5)
 
@@ -137,11 +144,11 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         resource = self._res_var.get()
         event = RaccoonEvents.SetResourceEvent(resource)
         self.app.eventManager.dispatchEvent(event)
-        
+
 
     def updateServerList_cb(self, event=None):
         """dispatch the event of updated (added/removed) server
-            list 
+            list
         """
         event = RaccoonEvents.UpdateServerListEvent()
         self.app.eventManager.dispatchEvent(event)
@@ -155,7 +162,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
             return
         self.resource = resource
         self.app.resource = self.resource
-        
+
         self.app.parent.title("AutoDock | Raccoon \t[ resource : %s ]" % self.resource)
         if self.resource == 'local':
             self.setLocalResource()
@@ -163,6 +170,8 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
             self.setClusterResource()
         elif self.resource == 'opal':
             self.setOpalResource()
+        elif self.resource == 'boinc':
+            self.setBoincResource()
 
     def initIcons(self):
         """ initialize the icons for the interface"""
@@ -182,7 +191,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
         f = icon_path + os.sep + 'opal.png'
         self._ICON_opal = ImageTk.PhotoImage(Image.open(f))
-        
+
         f = icon_path + os.sep + 'cluster.png'
         self._ICON_cluster = ImageTk.PhotoImage(Image.open(f))
 
@@ -191,7 +200,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
         f = icon_path + os.sep + 'raccoon.png'
         self._ICON_raccoon = ImageTk.PhotoImage(Image.open(f))
-        
+
         f = icon_path + os.sep + 'refresh.png'
         self._ICON_refresh = ImageTk.PhotoImage(Image.open(f))
 
@@ -200,6 +209,9 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
         f = icon_path + os.sep + 'wizard.png'
         self._ICON_wizard = ImageTk.PhotoImage(Image.open(f))
+
+        f = icon_path + os.sep + 'boinc.png'
+        self._ICON_boinc = ImageTk.PhotoImage(Image.open(f))
 
 
 
@@ -218,9 +230,9 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
     def _makelocalpanel(self):
 
         """ populate the frame in the setup with the summary of local resources info
-        
+
             NOTE this function should be called when preferences are changed (i.e. default data dir)
-        
+
         """
         #print "setupTab> set resource gui to LOCAL |",
         self.resetFrame()
@@ -234,7 +246,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         tk.Radiobutton(f, text='AutoDock', variable = var,value='autodock').pack(side='left', expand=1,fill='y',anchor='nw')
         tk.Radiobutton(f, text='Vina', variable = var,value='vina').pack(side='left', expand=1,fill='y',anchor='ne')
         f.pack(side='top', anchor='n', expand=0, fill='x')
-        
+
         self._localbinlabel = tk.Label(g, text='/usr/local/bin/autodock4', font=self.FONT)
         self._localbinlabel.pack(side='top', anchor='n', expand=0, fill=None)
         tk.Button(g, text='Set executable...', **self.BORDER).pack(side='top',
@@ -249,8 +261,8 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         g = group.interior()
         f = tk.Frame(g)
         f.pack(expand=1,fill='both')
-        self.local_table = hf.SimpleTable(f, title_item='column', 
-                title_color ='#d8daf8', cell_color='white', 
+        self.local_table = hf.SimpleTable(f, title_item='column',
+                title_color ='#d8daf8', cell_color='white',
                 title_font = self.FONTbold, cell_font=self.FONT,
                 autowidth=True)
         self._updatelocalinfotable()
@@ -275,7 +287,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
     def _updatelocalinfotable(self):
         data = self._getlocalinfo()
         self.local_table.setData(data)
-        
+
 
     def _getlocalinfo(self):
         """ gather info data used to populate the local panel"""
@@ -284,7 +296,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         os_format = '%s %s (%s)'
         if info['system'] == 'Windows':
             os_string = os_format % (info['system'], info['release'], info['architecture'])
-                                    
+
         elif info['system'] == 'Linux':
             os_string = os_format % (info['system'],
                                     info['release'].split('-')[0],
@@ -316,8 +328,8 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         #self._updateserverinfo() XXX this should be called only upon connection...
 
     def _makeservertoolbar(self, target):
-        """ create the widgets to set/configure the server 
-        
+        """ create the widgets to set/configure the server
+
             (the binds to the servermanager?)
         """
 
@@ -330,7 +342,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
                             menu_font = self.FONT,
                             command = self.chooseServer,
                             menubutton_bd = 1, menubutton_highlightbackground = 'black',
-                            menubutton_borderwidth=1, menubutton_highlightcolor='black', 
+                            menubutton_borderwidth=1, menubutton_highlightcolor='black',
                             menubutton_highlightthickness = 1,
                             menubutton_height=1,
                             )
@@ -356,7 +368,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
             image=self._ICON_refresh, compound=None, **self.BORDER)
         b.pack(anchor='se', side='right',expand=0,fill='y',padx=1)
 
-        b = tk.Button(f, text='Prepare', command=self.racconizeServer, 
+        b = tk.Button(f, text='Prepare', command=self.racconizeServer,
             image=self._ICON_raccoon, compound=None, **self.BORDER)
         b.pack(anchor='se', side='right',expand=0,fill='y')
 
@@ -389,7 +401,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         else:
             self.serverChooser.setvalue(self.serverChooser_NULL)
 
-    
+
 
 
     def _makeinfopanel(self):
@@ -404,7 +416,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         # left top frame
         f1 = tk.Frame(g)
         table = tk.Frame(f1)
-        self.serverInfoTable = hf.SimpleTable(table, title_item= 'column', 
+        self.serverInfoTable = hf.SimpleTable(table, title_item= 'column',
                 title_color ='#d8daf8', cell_color='white', title_width=20,
                 title_font = self.FONTbold, cell_font=self.FONT,
                 autowidth=True)
@@ -423,7 +435,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         # service choice panel
         self._service_choice = tk.StringVar()
         tk.Label(f3, text="Selected docking service :", font=self.FONT).pack(expand=0,anchor='w',side='top')
-        self._service_label = tk.Label(f3, textvar = self._service_choice, font=self.FONTbold, 
+        self._service_label = tk.Label(f3, textvar = self._service_choice, font=self.FONTbold,
             anchor='w', bg='white', **self.BORDER)
         self._service_label.pack(expand=1, fill='both', anchor='w', side='left')
         f3.pack(side='top', anchor='n', padx=2,pady=7, expand=1,fill='x')
@@ -461,12 +473,12 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         if self.app.server == None: return
         sm = ServiceManager(self.app, self.frame)
         sm()
-        
+
 
 
     def closeconnection(self,event=None):
-        """ disconnect from the currently connected 
-            server and set several vars to None 
+        """ disconnect from the currently connected
+            server and set several vars to None
         """
         if self.app.server == None:
             return
@@ -487,7 +499,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
     def _openservermanager(self, event=None):
         """ open the server manager window"""
         SshServerManagerWin( self.app, parent = self.parent)
-        
+
 
     def chooseServer(self, server=None, event=None):
         """manage the server selection from pulldown"""
@@ -576,9 +588,9 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
                 self.app.server = None
                 self.app.setReady()
                 return
-            
+
     def racconizeServer(self,event=None):
-        """ prepare ask the RaccoonServer to prepare the cluster 
+        """ prepare ask the RaccoonServer to prepare the cluster
             with required directories, etc...
         """
         force = False
@@ -631,7 +643,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         else:
             manifesto = self.app.server.manifesto(None)
         self._servermanifesto = manifesto
-        
+
     def _getclustinfo(self):
         """query the server and gather basic cluster info"""
 
@@ -647,7 +659,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         else:
             i = self._servermanifesto['host_info']
             racconized = self.app.server.checkServerStatus()
-            if racconized: 
+            if racconized:
                 r = 'READY'
             else:
                 r = 'NOT READY'
@@ -660,7 +672,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
             # check that there's a known scheduler
             self._checkscheduler(i['scheduler'])
         self.serverInfoTable.setData(data)
-        
+
 
     def _checkscheduler(self, sched):
         """ be sure that the scheduler is known"""
@@ -680,8 +692,8 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
     def _getservicesinfo(self):
         """ populate and arrange services info in the panel
-        
-        
+
+
             NOTE: due to the use of a Pmw.ScrolledFrame
                   it is not possible to get rid of the white
                   background
@@ -766,7 +778,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
         # XXX disabled 17.3.2013 SF
         #     the user should do a deliberate choice for this
-        #     Maybe add option to define preferred service 
+        #     Maybe add option to define preferred service
         #     on the server?
         #
         # if only one service is present, automatically select it... is that good?
@@ -779,7 +791,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
             and re-direct them to the radiobutton
         """
         self.buttons[count].invoke()
-        
+
 
     def setService_cb(self, event=None):
         self.setService()
@@ -788,7 +800,7 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         """ set the service to be used for docking
             reset=True is used when disconnecting
         """
-        if reset: 
+        if reset:
             #print "Resetting service"
             self.app.dockingservice = None
             self._service_choice.set('')
@@ -809,7 +821,116 @@ class SetupTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.frame.pack(expand=1, fill='both')
         #print "Raccoon GUI resource:", self.app.resource
 
+    def setBoincResource(self):
+        #print "setupTab> set resource gui to BOINC |",
+        self.app.boincService = BoincClient.BoincService()
+        self.resetFrame()
+        self._makeboincpanel()
+        self.frame.pack(expand=1, fill='both')
+        #print "Raccoon GUI resource:", self.app.resource
 
+    def _makeboincpanel(self):
+        """ create a panel for boinc resources
+        """
+        boinc_settings = self.app.settings['boinc']
+        saved_address = ''
+        saved_email = ''
+        for k in boinc_settings.keys():
+            if k == 'address':
+                saved_address = boinc_settings[k]
+            elif k == 'email':
+                saved_email = boinc_settings[k]
+        if saved_address == '':
+            saved_address = 'https://boinc.berkeley.edu/central/'
+        ### info panel
+        group = Pmw.Group(self.frame, tag_text = 'Server', tag_font=self.FONTbold)
+        g = group.interior()
+
+        # left top frame
+        f1 = tk.Frame(g)
+
+        # address
+        f = tk.Frame(f1)
+        tk.Label(f, text='Address:', anchor='e', width=14, font=self.FONT).pack(anchor='w', side='left')
+        self.info_boinc_address = Pmw.EntryField( f, value=saved_address, validate = {'min':1,'minstrict':0},entry_width=30, entry_font = self.FONT)
+        self.info_boinc_address.pack(anchor='w', side='left', expand=1, fill='x')
+        f.pack(side = 'top', expand=0, fill='x', anchor='w',pady=4,padx=3)
+
+        # email
+        f = tk.Frame(f1)
+        tk.Label(f, text='E-Mail:', anchor='e', width=14, font=self.FONT).pack(anchor='w', side='left')
+        self.info_boinc_email = Pmw.EntryField( f, value=saved_email, validate = {'min':1,'minstrict':0}, entry_width=30, entry_font = self.FONT)
+        self.info_boinc_email.pack(anchor='w', side='left', expand=1, fill='x')
+        f.pack(side = 'top', expand=0, fill='x', anchor='w',pady=4,padx=3)
+
+        # password:
+        f = tk.Frame(f1)
+        tk.Label(f, text='Password:', anchor='e', width=14, font=self.FONT).pack(anchor='w', side='left')
+        self.info_boinc_password = Pmw.EntryField( f, entry_show='*', validate = {'min':1,'minstrict':0}, entry_width=30, entry_font = self.FONT)
+        self.info_boinc_password.pack(anchor='w', side='left', expand=1, fill='x')
+        f.pack(side = 'top', expand=0, fill='x', anchor='w',pady=4,padx=3)
+
+        # authenticate:
+        f = tk.Frame(f1)
+        tk.Button(f, text='Authenticate', width=14, command=self._boinc_authenticate, compound=None, font=self.FONT, **self.BORDER).pack(anchor='w', side='left')
+        self.info_boinc_status = tk.StringVar()
+        self.info_boinc_status.set('Not authenticated')
+        self._boinc_authenticate_label = tk.Label(f, textvariable=self.info_boinc_status, width=30, font=self.FONT, fg='red2')
+        self._boinc_authenticate_label.pack(anchor='w', side='left')
+        f.pack(side = 'top', expand=0, fill='x', anchor='w',pady=4,padx=3)
+
+        f1.pack(side='left', anchor='n', expand=0, fill='none')
+
+        # right top frame
+        f2 = tk.Frame(g)
+
+        # info
+        f = tk.Frame(f2)
+        boinc_info = 'BOINC is a platform for distributed high throughput computing, i.e. large numbers of independent compute-intensive jobs, where there performance goal is high rate of job completion rather than low turnaround time of individual jobs. It also offers low-level mechanisms for distributed data storage. BOINC has a client/server architecture: the server distributes jobs, while the client runs on worker nodes, which execute jobs.\n'
+        nodes_info = 'The worker nodes are consumer devices (desktop and laptop computers, tablets, smartphones) volunteered by their owners. BOINC addresses the various challenges inherent in this environment (heterogeneity, host churn and unreliability, scale, security, and so on). There are a number of volunteer-computing BOINC projects such as SETI@home, LHC@home, World Community Grid, and so on. The BOINC client can be "attached" to one or many of these; it processes jobs for the projects to which it is attached.\n'
+        license_info = 'BOINC is distributed under the LGPL v3 open-source license. It can be used for any purpose (academic, commercial, or private) and can be used with applications that are not open-source.'
+        tk.Message(f, text=boinc_info+nodes_info+license_info, anchor='e', font=self.FONT).pack(anchor='w', side='left', expand=1, fill='x')
+        f.pack(side = 'top', expand=1, fill='both', anchor='w',pady=4,padx=3)
+
+        #register
+        f = tk.Frame(f2)
+        tk.Button(f, text='Register', width=14, command=self._boinc_register, compound=None, font=self.FONT, **self.BORDER).pack(anchor='w', side='left')
+        f.pack(side = 'top', expand=0, fill='x', anchor='w',pady=4,padx=3)
+
+        f2.pack(side='left', anchor='n', expand=1, fill='none')
+
+        # bottom frame
+        group.pack(expand=1, fill='both',anchor='center', side='top',padx=5, pady=5)
+
+        self.frame.pack(expand=1, fill='both')
+        #print "Raccoon GUI resource:", self.app.resource
+
+    def _boinc_authenticate(self):
+        """ authenticate with boinc server
+        """
+        if self.info_boinc_address.get() == '' or self.info_boinc_email.get() == '' or self.info_boinc_password.get() == '':
+            tmb.showerror('Error', 'Please fill in all fields')
+            return
+        success, status = self.app.boincService.authenticate(self.info_boinc_address.get(), self.info_boinc_email.get(), self.info_boinc_password.get())
+        self.info_boinc_status.set(status)
+        if success:
+            self._boinc_authenticate_label.config(fg='green3')
+            self.app.settings['boinc']['address'] = self.info_boinc_address.get()
+            self.app.settings['boinc']['email'] = self.info_boinc_email.get()
+            self.app.saveBoincInfo()
+        else:
+            self._boinc_authenticate_label.config(fg='red2')
+
+    def _boinc_register(self):
+        """ register with boinc server
+        """
+        address = self.info_boinc_address.get()
+        if address == '' or address is None:
+            address = 'https://boinc.berkeley.edu/central/'
+        if not address.endswith('/'):
+            address += '/'
+        url = address + 'signup.php'
+        webbrowser.open(url, new=0, autoraise=True)
 
 class PasswordPromptWin(rb.RaccoonDefaultWidget, DebugObj):
     """prompt the password and show some info if necessary..."""
@@ -823,7 +944,7 @@ class PasswordPromptWin(rb.RaccoonDefaultWidget, DebugObj):
         title = 'Password connection'
 
         self.dialog = Pmw.PromptDialog(self.parent, title = title, # label_text='password : ',
-            entry_show='*', entry_width=40, entry_justify='center', 
+            entry_show='*', entry_width=40, entry_justify='center',
             defaultbutton = 0, buttons = ('Connect with password', 'Cancel'),
             command = self.execute)
         bbox = self.dialog.component('buttonbox')
@@ -853,8 +974,8 @@ class PasswordPromptWin(rb.RaccoonDefaultWidget, DebugObj):
             auth = 'none'
         info.append(['authetication saved', auth])
 
-        table = hf.SimpleTable(g.interior(), title_item='column', 
-                title_color ='#d8daf8', cell_color='white', 
+        table = hf.SimpleTable(g.interior(), title_item='column',
+                title_color ='#d8daf8', cell_color='white',
                 title_font = self.FONTbold, cell_font=self.FONT,
                 autowidth=True)
         table.setData(info)
@@ -871,7 +992,7 @@ class PasswordPromptWin(rb.RaccoonDefaultWidget, DebugObj):
 
             f.pack(side='top', anchor='w',expand=1, fill='both', padx=4, pady=4)
             g.pack(side='top', anchor='n', padx=5, pady=5, ipadx=5, ipady=4, fill='x', expand=0)
-            
+
         msg = 'Insert password to connect to %s (%s)' % (name, data['address'])
         tk.Label(parent, text = msg, justify='left', font=self.FONT).pack(anchor='n',side='top', padx=10, pady=5)
         self.dialog.component('dialogchildsite').pack(side='top', anchor='n',expand=1,fill='both')
@@ -889,7 +1010,7 @@ class PasswordPromptWin(rb.RaccoonDefaultWidget, DebugObj):
         self.dialog.deactivate()
         self.app.setReady()
         return passwd
-        
+
 
 class SshServerManagerWin(rb.RaccoonDefaultWidget):
     """ provide interface for adding a new connection to Raccoon"""
@@ -924,7 +1045,7 @@ class SshServerManagerWin(rb.RaccoonDefaultWidget):
         icon_path = CADD.Raccoon2.ICONPATH
 
         f = icon_path + os.sep + 'floppy.png'
-        self._ICON_save = ImageTk.PhotoImage(Image.open(f))        
+        self._ICON_save = ImageTk.PhotoImage(Image.open(f))
 
         f = icon_path + os.sep + 'add.png'
         self._ICON_add = ImageTk.PhotoImage(Image.open(f))
@@ -1019,17 +1140,17 @@ class SshServerManagerWin(rb.RaccoonDefaultWidget):
         f = tk.Frame(self.info)
         tk.Label(f, text='authentication:', anchor='e', width=14, font=self.FONT).pack(anchor='n', side='left')
         g = tk.Frame(f, relief = 'groove', bd = 2) #Pmw.Group(self.info, tag_text = 'Authentication method', tag_font=self.FONT)
-        
+
         x = tk.Frame(g)
-        self.authMethod_password = tk.Radiobutton(x, text='password', value='password', 
+        self.authMethod_password = tk.Radiobutton(x, text='password', value='password',
             variable = self.authMethod, font=self.FONT, command=self.setAuthMethod)
         self.authMethod_password.pack(side='left', anchor='w', padx = 3)
 
-        self.authMethod_file = tk.Radiobutton(x, text='load key file', value='file', 
+        self.authMethod_file = tk.Radiobutton(x, text='load key file', value='file',
             variable = self.authMethod, font=self.FONT, command=self.setAuthMethod)
         self.authMethod_file.pack(side='left', anchor='w', padx = 3)
 
-        self.authMethod_system = tk.Radiobutton(x, text='system key file', value='system', 
+        self.authMethod_system = tk.Radiobutton(x, text='system key file', value='system',
             variable = self.authMethod, font=self.FONT, command=self.setAuthMethod)
         self.authMethod_system.pack(side='left', anchor='w', padx = 3)
         x.pack(side='top', anchor='w')
@@ -1050,9 +1171,9 @@ class SshServerManagerWin(rb.RaccoonDefaultWidget):
 
         ### custom key file
         self._keyFileFrame = tk.Frame(self.authPanel)
-        tk.Button(self._keyFileFrame, image=self._ICON_open, command=self.openKeyFile, 
+        tk.Button(self._keyFileFrame, image=self._ICON_open, command=self.openKeyFile,
             **self.BORDER).pack(side='left', anchor='w', padx=3, pady=3)
-        self.info_keyfile = tk.Label(self._keyFileFrame, width = 30, font=self.FONT, relief='flat', 
+        self.info_keyfile = tk.Label(self._keyFileFrame, width = 30, font=self.FONT, relief='flat',
             bg='white', **self.BORDER)
         self.info_keyfile.value = None
         self.info_keyfile.pack(side='left', anchor='w',padx=3, pady=3)
@@ -1102,18 +1223,18 @@ class SshServerManagerWin(rb.RaccoonDefaultWidget):
         elif method == 'system':
             self._sysFileFrame.pack(pady=3,fill='x',expand=1)
         return
-            
+
 
     def openKeyFile(self, event=None, fname=None):
         """ select the key file to be used for authentication"""
         # XXX get the last user defined file! poat
-        # initialdir = 
+        # initialdir =
         initialdir = None
         if not self.info_keyfile.value == None:
             initialdir = os.path.dirname(self.info_keyfile.value)
         if fname == None:
             t = 'Select key file to import'
-            fname = tfd.askopenfilename(parent=self.win.interior(), 
+            fname = tfd.askopenfilename(parent=self.win.interior(),
                 initialdir = initialdir, title = t)
             if not fname:
                 return
@@ -1134,11 +1255,11 @@ class SshServerManagerWin(rb.RaccoonDefaultWidget):
         short = hf.truncateName(fname, 30)
         self.info_keyfile.configure(text = short)
         self.info_keyfile.value = fname
-            
+
 
 
     def touched(self, event=None):
-        """ triggered every time one of the entries get the 
+        """ triggered every time one of the entries get the
             focus, to trace user input
         """
         skip = [ 37, 50, 64, 108, 105, 62, 113, 114, 111, 116 ]
@@ -1224,7 +1345,7 @@ class SshServerManagerWin(rb.RaccoonDefaultWidget):
                  # ]
         err = []
         server = { 'name': None, 'address': None, 'username' : None, 'load_sys_host_key': False,
-                    'password' : None, 'pkey' : None, 
+                    'password' : None, 'pkey' : None,
                     }
 
         # check of text values
@@ -1339,7 +1460,7 @@ class ServiceManager(rb.PanedManager):
 
     def __init__(self, app, parent=None, wtitle='Service manager', ltitle='Installed', rtitle='Settings' ):
         rb.PanedManager.__init__(self, app, parent, wtitle, ltitle, rtitle)
-    
+
         # recognized services
         self._tags = { 'docking' : '[DOCKING]: ',
                      #'library_host': '[LIB_HOST]',
@@ -1399,7 +1520,7 @@ class ServiceManager(rb.PanedManager):
         """ initialize the icons for the interface"""
         icon_path = CADD.Raccoon2.ICONPATH
         f = icon_path + os.sep + 'floppy.png'
-        self._ICON_save = ImageTk.PhotoImage(Image.open(f))        
+        self._ICON_save = ImageTk.PhotoImage(Image.open(f))
 
         f = icon_path + os.sep + 'add.png'
         self._ICON_add = ImageTk.PhotoImage(Image.open(f))
@@ -1420,8 +1541,8 @@ class ServiceManager(rb.PanedManager):
         self.app.eventManager.dispatchEvent(e)
         self.app.setReady()
 
-        
-                
+
+
     def delete(self):
         """ delete the service from the server"""
         # XXX FIXME manage when the currently selected service is deleted!
@@ -1477,8 +1598,8 @@ class ServiceManager(rb.PanedManager):
 
 
     def _getcurrentservices(self):
-        """ retrieve info about known and currently 
-            installed services and update the list 
+        """ retrieve info about known and currently
+            installed services and update the list
             container with all services
         """
         # XXX this function for now handles only vina-docking
@@ -1521,8 +1642,8 @@ class ServiceManager(rb.PanedManager):
         self.service_template = VinaDockingTemplate(app=self.app, parent=self.frame, data=data)
         self.frame.pack(expand=1, fill='both', anchor='w', side='top')
 
-         
-    
+
+
 
     def createPanels(self):
         """ """
@@ -1530,7 +1651,7 @@ class ServiceManager(rb.PanedManager):
 
 ###
 ###    def populateInterface(self, data):
-###        
+###
 ###        # XXX creation of new service
 ###        #srv = RaccoonServices.knownservices[stype](server=self, config = service_dict, debug=self.debug )
 ###        VinaDockingTemplate(app=self.app, parent=self.parent)
@@ -1542,7 +1663,7 @@ class ServiceManager(rb.PanedManager):
 
 class VinaDockingTemplate(rb.RaccoonDefaultWidget):
     """ """
-    
+
     def __init__(self, app, parent, data=None):
         rb.RaccoonDefaultWidget.__init__(self, parent)
         self.initIcons()
@@ -1559,7 +1680,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
         #else:
         #    print "UNKNOWN ENGINE!", engine
 
-        #        self.config.update({ 'engine' : None, 'command' : None, 'ver' : None, 
+        #        self.config.update({ 'engine' : None, 'command' : None, 'ver' : None,
         #                    'multithread' : 1} )
         #        self.config = { 'file' : None, 'name' : '', 'comment': '',
         #            'service' : None, 'validated' : False}
@@ -1583,9 +1704,9 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
         f = icon_path + os.sep + 'default.gif'
         self._ICON_default = ImageTk.PhotoImage(Image.open(f))
         f = icon_path + os.sep + 'installer.png'
-        self._ICON_installer = ImageTk.PhotoImage(Image.open(f))        
+        self._ICON_installer = ImageTk.PhotoImage(Image.open(f))
         f = icon_path + os.sep + 'search.png'
-        self._ICON_search = ImageTk.PhotoImage(Image.open(f))        
+        self._ICON_search = ImageTk.PhotoImage(Image.open(f))
 
 
     def buildconfname(self, event=None):
@@ -1596,7 +1717,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
             self._config = ''
 
         valid = [ x for x in text if x in hf._allowedfilenamechars()]
-        valid = "".join(valid).lower() 
+        valid = "".join(valid).lower()
         self._config = valid
 
     def installBinary(self, event=None):
@@ -1634,13 +1755,13 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
             else:
                 #print "INSTALLING [%s]" % new_url
                 url = new_url
-        # start installation 
+        # start installation
         status = self.service.installEngine(url = url, force=force)
-        
+
         if status['success']:
             m = 'Installation successful.'
             i = 'info'
-            tmb.showinfo(parent = self.frame, 
+            tmb.showinfo(parent = self.frame,
                 title=t, message=m, icon=i)
             bin_name = status['reason'][0]
             #print "XXBIN", bin_name
@@ -1655,7 +1776,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
                  'the installation:\n\n%s' % err)
             i = 'error'
             tmb.showerror(parent=self.frame, title=t, message=m)
-            return False 
+            return False
 
 
 
@@ -1693,7 +1814,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
             #self._config.setentry(curr_conf_file)
 
         config_fname = self._config  + '.conf'
-             
+
         # save config file
         if self.service.initService(config):
             status = self.service.writeServiceConfig(config_fname, force=True)
@@ -1712,7 +1833,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
             m = 'The configuration is not valid!'
             i = 'error'
             value = False
-        
+
         if value:
             # register service from config file
             status = self.app.server.addServiceFromConf(config_fname)
@@ -1755,7 +1876,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
 
                     self._widgets[c].insert('end', config[c])
                 else:
-                    if c == 'file':  
+                    if c == 'file':
                         value = config[c].rsplit('/',1)[1]
                         value = value.rsplit('.', 1)[0]
                     else:
@@ -1791,7 +1912,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
 
 
     def touched(self, event=None):
-        """ triggered every time one of the entries get the 
+        """ triggered every time one of the entries get the
             focus, to trace user input
         """
         self._CLEAN = False
@@ -1807,10 +1928,10 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
 
         lwidth = 18
         # name
-        f = tk.Frame(self.frame) 
+        f = tk.Frame(self.frame)
         tk.Label(f, text='Name', font=self.FONT,width=lwidth, anchor='e').pack(side='left', anchor='w', padx=5, pady=0)
         self._name = Pmw.EntryField( f, entry_font=self.FONT,
-                    validate = {'min':1,'minstrict':0}) 
+                    validate = {'min':1,'minstrict':0})
         self._name.component('entry').bind('<KeyRelease>', self.touched, '+')
         self._name.pack(expand=1, fill='x', side='left', anchor='w')
         self._widgets['name'] = self._name
@@ -1831,7 +1952,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
         y.pack(expand=1, fill='x',padx=0,pady=0, side='top', anchor='w')
 
         # binary installer
-        tk.Button(x, text='Install AutoDock Vina on the server...', image=self._ICON_installer, compound='left', 
+        tk.Button(x, text='Install AutoDock Vina on the server...', image=self._ICON_installer, compound='left',
                 font=self.FONT, command=self.installBinary, **self.BORDER).pack(anchor='w',
                 side='left', padx=2,pady=2, expand=1,fill='x')
         x.pack(expand=1, fill='x',padx=0,pady=3, side='top', anchor='w')
@@ -1839,7 +1960,7 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
         f.pack(expand=0, fill='x', anchor='w', side='top',pady=2, padx=10)
 
         # multithread
-        f = tk.Frame(self.frame) 
+        f = tk.Frame(self.frame)
         tk.Label(f, text='Multi-thread', font=self.FONT,width=lwidth, anchor='e').pack(side='left', anchor='n', padx=5, pady=4)
         self._multithread = Pmw.Counter( f, autorepeat=False,
             entry_width=5, entryfield_validate = {'validator' : hf.validatePosNonNullInt, 'min':1,'minstrict':0},
@@ -1884,8 +2005,8 @@ class VinaDockingTemplate(rb.RaccoonDefaultWidget):
                     'multithread': self._multithread.getvalue()
                 }
 
-        
-        
+
+
 
 
 class LinkPrompt:
@@ -1910,12 +2031,12 @@ class LinkPrompt:
 
     def execute(self, result):
         if result is None or result == 'Cancel':
-            self.dialog.deactivate()        
+            self.dialog.deactivate()
             return False
         else:
             #result = self.confirm.activate()
             if self.dialog.component('entryfield').valid():
-                self.dialog.deactivate()        
+                self.dialog.deactivate()
                 return self.dialog.get()
             else:
                 t = 'Invalid web URL'
@@ -1925,4 +2046,4 @@ class LinkPrompt:
 
 
 
-    
+

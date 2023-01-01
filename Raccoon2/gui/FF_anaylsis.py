@@ -1,17 +1,17 @@
-#       
+#
 #           AutoDock | Raccoon2
 #
 #       Copyright 2013, Stefano Forli
 #          Molecular Graphics Lab
-#  
-#     The Scripps Research Institute 
-#           _  
+#
+#     The Scripps Research Institute
+#           _
 #          (,)  T  h e
 #         _/
 #        (.)    S  c r i p p s
 #          \_
 #          (,)  R  e s e a r c h
-#         ./  
+#         ./
 #        ( )    I  n s t i t u t e
 #         '
 #
@@ -35,7 +35,7 @@ import CADD.Raccoon2
 import CADD.Raccoon2.HelperFunctionsN3P as hf
 import RaccoonBasics as rb
 import RaccoonEvents
-import RaccoonPmvCamera 
+import RaccoonPmvCamera
 import TkTreectrl
 import DebugTools
 import RaccoonResTree
@@ -61,14 +61,14 @@ from MolKit.pdbWriter import PdbWriter
 import shutil
 
 class AnalysisTab(rb.TabBase, rb.RaccoonDefaultWidget):
-    
+
     def __init__(self, app, parent, debug=False):
         rb.TabBase.__init__(self, app, parent, debug = False)
         rb.RaccoonDefaultWidget.__init__(self, parent)
         self.resource = self.app.resource
         self.dockengine = self.app.dockengine
         #self.app.eventManager.registerListener(RaccoonEvents.SetResourceEvent, self.handleResource)
-        
+
         self.initIcons()
         self.makeInterface()
 
@@ -111,14 +111,14 @@ class AnalysisTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
 
 class DataSourceTab(rb.TabBase, rb.RaccoonDefaultWidget):
-    
+
     def __init__(self, app, parent, debug=False):
         rb.TabBase.__init__(self, app, parent, debug = False)
         rb.RaccoonDefaultWidget.__init__(self, parent)
         self.resource = self.app.resource
         self.dockengine = self.app.dockengine
         #self.app.eventManager.registerListener(RaccoonEvents.SetResourceEvent, self.handleResource)
-        
+
         #self.initIcons()
         self.makeInterface()
 
@@ -155,12 +155,12 @@ class DataSourceTab(rb.TabBase, rb.RaccoonDefaultWidget):
         handle.place_forget()
         handle.forget()
         handle.pack_forget()
-        handle.grid_forget()        
+        handle.grid_forget()
 
         # manage separator cosmetics
         sep.configure(bd =2, #bg = '#999999'
             highlightthickness=1, highlightbackground='black', highlightcolor='black')
-        # separator for rearranging 
+        # separator for rearranging
         spacer = tk.Frame(self.right, width=8)
         spacer.pack(expand=0, fill='y',side='left', anchor='w')
         # nail handle
@@ -204,7 +204,7 @@ class DataSourceTab(rb.TabBase, rb.RaccoonDefaultWidget):
         y += deltay
         newgeom = "%sx%s+%s" % (x,y,offset)
         self.app.master.geometry(newgeom)
-        
+
 
 
 
@@ -253,16 +253,16 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
         items = [ ['Add results'],
                   ['Select downloaded results...', 'normal', self.selectFromTree ],
                   ['Import from summary log file...', 'normal', self.importLogAskRec ],
-        #          ['Process directory (AD)...', 'normal', self.processDirAD ], 
-                  ['Process directory (Vina)...', 'normal', self.processDirVINA ],  
-                  ] 
+        #          ['Process directory (AD)...', 'normal', self.processDirAD ],
+                  ['Process directory (Vina)...', 'normal', self.processDirVINA ],
+                  ]
         menu = rb.RacMenu(b2, items, toolbar=f, placement='under')
         # remove
         b3 = tk.Button(f, image=self._ICON_remove, **self.BORDER)
         b3.pack(anchor='w',side='left', padx=1)
         items = [ ['Remove results'],
                   ['Remove selected', 'normal', self.removeSelected ],
-                  ['Remove all...', 'normal', self.removeAll ], ] 
+                  ['Remove all...', 'normal', self.removeAll ], ]
         menu = rb.RacMenu(b3, items, toolbar=f, placement='under')
 
         f.pack(expand=0, fill='x', side='top', anchor='n',padx=2)
@@ -274,7 +274,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
         self.resmanager.pack(expand=1, fill='both', anchor='n', side='top')
         #  total result counts label
         f = tk.Frame(self.interior())
-        tk.Label(f, text='Total docking results:', anchor='w', 
+        tk.Label(f, text='Total docking results:', anchor='w',
             font=self.FONTbold).pack(side='left', anchor='w',padx=2)
         self.rescountLabel = tk.Label(f, text='0', anchor='w', bg='white', font=self.FONT, **self.BORDER)
         self.rescountLabel.pack(side='left',anchor='w',expand=1,fill='x',padx=2)
@@ -288,6 +288,9 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
 
     def selectFromTree(self, event=None):
         """ select downloaded results from the project tree"""
+        if (self.app.resource == 'boinc'):
+            self.processDirVINA(event)
+            return
         #print "SELECTING FROM TREE"
         parent = self.resmanager.listbox
         pool = {}
@@ -311,7 +314,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
             return
 
         choice = RaccoonResTree.DictTreeCheckSelector(self.resmanager.listbox, pool)
-        jobs = self.getSelectedResults(choice.result) 
+        jobs = self.getSelectedResults(choice.result)
         #print "JOBS", jobs
         ready = []
         tobeprocessed = []
@@ -321,7 +324,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
             summary = info['summary']
             #print "SSMERIAN", summary, "====", p, e, v
             if summary:
-                summary = os.path.join(self.app.getJobDir((p,e,v)), summary)  
+                summary = os.path.join(self.app.getJobDir((p,e,v)), summary)
                 if os.path.exists(summary):
                     ready.append(summary)
             else:
@@ -379,7 +382,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
         # use the log file as name suggestion
         t = 'Import processed log file'
         ft = [("Raccoon summary log file", ("*.log")),
-              ("Any file type...", "*")] 
+              ("Any file type...", "*")]
         idir = self.app._lastdir
         p = self.resmanager.listbox
         if logfile == None:
@@ -394,7 +397,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
         if askrec:
             t = 'Select receptor filename'
             ft = [("PDBQT receptor", ("*.pdbqt")),
-                      ("Any file type...", "*")] 
+                      ("Any file type...", "*")]
             rec = tfd.askopenfilename(parent=p, title=t, initialdir=idir, filetypes=ft)
             if not rec:
                 return
@@ -413,7 +416,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
             t = 'Error'
             i = 'error'
             m = ('Invalid Raccoon log file.\n\n[Error: %s]' % e)
-            tmb.showinfo(parent = self.resmanager.listbox, 
+            tmb.showinfo(parent = self.resmanager.listbox,
                 title=t, icon=i, message=m)
 
     def addResManEntry(self, data, name):
@@ -429,8 +432,8 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
         rec = i['recname']
         count = len(data.items())
         self.resmanager.listbox.insert('END', name, rec, count, ebest, eworst)
-            
-    
+
+
     def checkDockEngineMatch(self, required):
         """ check that the selected engine matches the
             results anaylsis requested by user
@@ -491,7 +494,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
                 receptor_ok = True
         # load new receptor
         if not receptor_ok:
-            receptor = self.searchReceptor(dirname) 
+            receptor = self.searchReceptor(dirname)
             if not receptor:
                 return
             self.app.resultsProcessor.setReceptor(receptor)
@@ -536,7 +539,7 @@ class ResultsManager(rb.RaccoonDefaultWidget, DebugTools.DebugObj,  Pmw.Group):
         if receptor == None:
             t = 'Select receptor file'
             filetypes = [("Supported ligand formats", ("*.pdbqt","*.PDBQT" )),
-                         ("PDBQT", ("*.pdbqt", "*.PDBQT")), ("Any file type...", "*")]        
+                         ("PDBQT", ("*.pdbqt", "*.PDBQT")), ("Any file type...", "*")]
             receptor = tfd.askopenfilename(parent=self.parent, title = t,
                 filetypes = filetypes, initialdir=dirname)
         print "SEARCH RECEPTOR SAID", receptor, type(receptor), "|%s|" % receptor
@@ -598,9 +601,9 @@ class FilterManager(rb.RaccoonDefaultWidget, Pmw.Group, DebugTools.DebugObj):
 
         self.app = app
         self.mode = mode # define wich filters are going to be created
-        
+
         # filters
-        self.filtWidgets = {} # item.getvalues() 
+        self.filtWidgets = {} # item.getvalues()
         self._accepted = 0
         self._pending = None
         self._DEFAULT_FILTERSET = '<default>'
@@ -641,14 +644,14 @@ class FilterManager(rb.RaccoonDefaultWidget, Pmw.Group, DebugTools.DebugObj):
         f = tk.Frame(i)
         # filter set menu
         self.filterSetMenu = OptionMenuFix(f, labelpos= 'w', label_text = 'Filter set',
-                label_font = self.FONT, menubutton_width = 40, menubutton_font = self.FONT, 
+                label_font = self.FONT, menubutton_width = 40, menubutton_font = self.FONT,
                 menu_font = self.FONT, items = sorted(self.filterSets.keys()) )
         self.filterSetMenu.pack(side='left', anchor='w')
         # save button
         tk.Button(f, image=self._ICON_save, command=self.saveFilterSet,
             **self.BORDER).pack(side='left', anchor='w')
         # del button
-        tk.Button(f, image=self._ICON_remove, command=self.saveFilterSet, 
+        tk.Button(f, image=self._ICON_remove, command=self.saveFilterSet,
             **self.BORDER).pack(side='left', anchor='w', padx=1)
         f.pack(expand=1,fill='x', padx=5)
         """
@@ -683,8 +686,8 @@ class FilterManager(rb.RaccoonDefaultWidget, Pmw.Group, DebugTools.DebugObj):
                 font = self.FONTbold, compound='left', command=self.startFilter, **self.BORDER)
         self.applyButton.pack(side='right', anchor='w', padx=1,expand=1,fill='x',pady=6)
 
-        tk.Checkbutton(f, text='Auto-update', height=22, width=22, image=self._ICON_run, 
-                compound = None, variable=self.autoupdate, onvalue=True, offvalue=False, 
+        tk.Checkbutton(f, text='Auto-update', height=22, width=22, image=self._ICON_run,
+                compound = None, variable=self.autoupdate, onvalue=True, offvalue=False,
                 indicatoron=False, command=self.autoFilter, #offrelief='flat',
                 **self.BORDER).pack(side='right', anchor='e', padx=1)
 
@@ -693,10 +696,10 @@ class FilterManager(rb.RaccoonDefaultWidget, Pmw.Group, DebugTools.DebugObj):
         self.interactFiltManager.pack(side='top', anchor='w', padx=5, expand=1, fill='both')
 
         f = tk.Frame(i) #, bg='white', **self.BORDER)
-        tk.Label(f, text='Accepted ligands:', font=self.FONTbold, 
+        tk.Label(f, text='Accepted ligands:', font=self.FONTbold,
             anchor='w').pack(expand=0, fill='x',side='left', anchor='w')
 
-        self.totalLabel = tk.Label(f, text=str(self._accepted), 
+        self.totalLabel = tk.Label(f, text=str(self._accepted),
             font=self.FONT, anchor='w') #, bg='white', **self.BORDER)
         self.totalLabel.pack(expand=1, fill='x',side='left', anchor='w')
         # tk.Label(f, text='max accepted results')
@@ -718,7 +721,7 @@ class FilterManager(rb.RaccoonDefaultWidget, Pmw.Group, DebugTools.DebugObj):
         self.filtWidgets['leff'].setrange(*leffrange)
 
     def getfilters(self, _type = None):
-        """ return the min/max tuples of all 
+        """ return the min/max tuples of all
             filters or of the specified one
         """
         filters = {}
@@ -751,7 +754,7 @@ class FilterManager(rb.RaccoonDefaultWidget, Pmw.Group, DebugTools.DebugObj):
 
     def autoFilter(self, event=None):
         """ manage the trigger of autoupdate"""
-        if not self.autoupdate.get(): 
+        if not self.autoupdate.get():
             return
         if self._pending:
             self.parent.after_cancel(self._pending)
@@ -801,16 +804,16 @@ class FilterManager(rb.RaccoonDefaultWidget, Pmw.Group, DebugTools.DebugObj):
         pc = hf.percent(intcount, total_results)
         #self.filtWidgets['interactions'].setpassed(lecount, pc)
         self.interactFiltManager.setpassed(intcount, pc)
-        #  
+        #
         self._accepted = accepted
-        text = '%d / %d\t [ %2.3f%% ]' % (self._accepted, 
+        text = '%d / %d\t [ %2.3f%% ]' % (self._accepted,
                     total_results, hf.percent(self._accepted, total_results) )
         self.totalLabel.configure(text=text) # = str(self._accepted) )
-        
+
 
     def saveFilterSet(self, event=None):
         """ ask for a new filter set name
-            suggesting the initial one and 
+            suggesting the initial one and
             and checking for duplicates
         """
         self._DEFAULT_FILTERSET = '<default>'
@@ -886,7 +889,7 @@ class FilterPropertyWidget(rb.RaccoonDefaultWidget,Pmw.Group):
         #)
             ring_border=1, ring_highlightcolor='black', ring_highlightbackground='black',
             ring_highlightthickness=1,ring_relief='flat')
-        
+
         self.title = title
         self.vmin = vmin
         self.vmax = vmax
@@ -914,7 +917,7 @@ class FilterPropertyWidget(rb.RaccoonDefaultWidget,Pmw.Group):
         self.rframe = tk.Frame(self.interior())
         self.rframe.pack(expand=0,fill=None, anchor='e', side='left')
 
-        # slider 
+        # slider
         f = tk.Frame(self.lframe)
         self.slider = RangeSlider(f, width=280, height=17, cb=self.slider_cb)
         #self.slider.canvas.bind('<Double-Button-2>', self.reset)
@@ -922,7 +925,7 @@ class FilterPropertyWidget(rb.RaccoonDefaultWidget,Pmw.Group):
         f.pack(expand=0, fill='none',anchor='n', side='top')
 
         # entry text with validator
-        entry_settings = { 'entry_width' : 10, 'entry_bd' : 1, 'entry_highlightbackground' :'black', 
+        entry_settings = { 'entry_width' : 10, 'entry_bd' : 1, 'entry_highlightbackground' :'black',
                            'entry_borderwidth' : 1, 'entry_highlightcolor' :'black',
                            'entry_highlightthickness' : 1, 'entry_font' : self.FONT,
                            'entry_justify' : 'center',
@@ -931,20 +934,20 @@ class FilterPropertyWidget(rb.RaccoonDefaultWidget,Pmw.Group):
                            }
 
         f = tk.Frame(self.lframe)
-        # min 
-        self.minentry = Pmw.EntryField(f, label_text = 'worst ', value=self.vmin, 
+        # min
+        self.minentry = Pmw.EntryField(f, label_text = 'worst ', value=self.vmin,
                 validate = {'validator' : self.validatemin, 'minstrict': 0},
                 command=self.setminslider, **entry_settings)
         self.minentry.pack(side='left', anchor='w',pady=4)
 
         # max
-        self.maxentry = Pmw.EntryField(f, label_text = 'best ', value=self.vmax, 
+        self.maxentry = Pmw.EntryField(f, label_text = 'best ', value=self.vmax,
             validate = {'validator' : self.validatemax, 'minstrict': 0},
             command=self.setmaxslider, **entry_settings)
         self.maxentry.pack(side='left', anchor='e',pady=4)
 
         # default button
-        b = tk.Button(f, text='D', image=self._ICON_default, 
+        b = tk.Button(f, text='D', image=self._ICON_default,
             command=self.reset, **self.BORDER)
         b.pack(side='left', anchor='e',pady=4, padx= 10)
         f.pack(side='top', anchor='w',padx=3, expand=1, fill='x')
@@ -962,7 +965,7 @@ class FilterPropertyWidget(rb.RaccoonDefaultWidget,Pmw.Group):
         f.pack(anchor='n', side='top')
         if not self.return_cb == None:
             self.bind('Return', self.return_cb)
-            
+
     def reset(self, event=None):
         """ reset the filter to its defaults"""
         self.minentry.setvalue(self.vmin)
@@ -981,7 +984,7 @@ class FilterPropertyWidget(rb.RaccoonDefaultWidget,Pmw.Group):
         return sorted( (float(self.maxentry.getvalue()), float(self.minentry.getvalue())) )
 
     def setpassed(self, count, percentage):
-        """ set the numerical value of 
+        """ set the numerical value of
             items that passed this filter
         """
         self.statusLabel.configure(text=count)
@@ -1074,7 +1077,7 @@ class FilterPropertyWidget(rb.RaccoonDefaultWidget,Pmw.Group):
             return Pmw.PARTIAL
         else:
             return Pmw.OK
-                
+
         #except AttributeError:
         #    # first time packing
         #    print "Packing sliders with initial values (catching error: %s)"%  sys.exc_info()[1]
@@ -1109,7 +1112,7 @@ class FilterInteractionWidget(rb.RaccoonDefaultWidget,Pmw.Group):
     def __init__(self, parent):
         rb.RaccoonDefaultWidget.__init__(self, parent)
         Pmw.Group.__init__(self, self.parent, tag_text = 'Interactions', tag_font=self.FONTbold)
-        
+
         self.initIcons()
         self.makeInterface()
 
@@ -1137,7 +1140,7 @@ class FilterInteractionWidget(rb.RaccoonDefaultWidget,Pmw.Group):
 ############################## VIEWER TAB
 
 class ViewerTab(rb.TabBase, rb.RaccoonDefaultWidget):
-    
+
     def __init__(self, app, parent, debug=False):
         rb.TabBase.__init__(self, app, parent, debug = False)
         rb.RaccoonDefaultWidget.__init__(self, parent)
@@ -1146,7 +1149,7 @@ class ViewerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.camera = None
         #self.app.eventManager.registerListener(RaccoonEvents.SetResourceEvent, self.handleResource)
         self.eventManager = RaccoonEvents.RaccoonEventManager()
- 
+
         self.initIcons()
         self.makeInterface()
 
@@ -1180,7 +1183,7 @@ class ViewerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.left = self.analysis_pad.add('info', min=0, size=300)
         self.right =  self.analysis_pad.add('viewer', min=3, size=600)
         handle = self.analysis_pad.component('handle-1')
-        sep = self.analysis_pad.component('separator-1')        
+        sep = self.analysis_pad.component('separator-1')
 
         handle.place_forget()
         handle.forget()
@@ -1203,7 +1206,7 @@ class ViewerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.resSelector = ResultSelectorPanel(self.left, self.app, viewertab=self)
         self.resSelector.pack(side='top', anchor='n', expand=1, fill='both', padx=3, pady=3)
 
-        #tk.Label(self.info_group.interior(), 
+        #tk.Label(self.info_group.interior(),
         #    text="TERRIBLE THINGS ARE GOING TO HAPPEN HERE\n\n(VISUAL ANALYSIS)").pack(expand=1, fill='both')
         tk.Frame(self.left, width=4).pack(side='right',anchor='w', expand=0,fill='y')
         #self.info_group.pack(expand=1,fill='both',side='left',anchor='w')
@@ -1224,7 +1227,7 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
         rb.RaccoonDefaultWidget.__init__(self, parent)
         Pmw.Group.__init__(self, self.parent, tag_text = '3D Viewer', tag_font=self.FONTbold)
         #tk.Frame.__init__(self, self.parent)
-        self.app = app 
+        self.app = app
         self.viewertab = viewertab
         self.camera = None
         self.initIcons()
@@ -1265,7 +1268,7 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
         tk.Button(t, text='I', image=self._ICON_center_all, compound=None, command=cb, **self.BORDER).pack(side='top', anchor='n')
         t.pack(side='left', anchor='n', expand=0, fill='x')
 
-        # grid cam name 
+        # grid cam name
         name = 'analysiscam'
         bgcolor = (.6, .6, .6,)
 
@@ -1278,7 +1281,7 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
         if self.camera == None:
             self.camera = self.app.viewer.addCamera(self.interior(), name=name, depth=True, bgcolor=bgcolor,sharecontext=True)
             self.camera_name = self.viewertab.camera_name = name
-        # self.viewertab.eventManager.registerListener(RaccoonEvents.LigandResultPicked, 
+        # self.viewertab.eventManager.registerListener(RaccoonEvents.LigandResultPicked,
 
     def loadResult(self, event=None):
         """ manage loading the molecules in results
@@ -1313,7 +1316,7 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
             else:
                 viewer.deleteInCamera( self._currRec['obj'], cam)
                 self._currRec['name'] = recname
-        
+
         # FIXME fragile! this shouldn't be used unless desperate measures
         if recfname == None:
             print "WARNING! GUESSING RECEPTOR FILENAME"
@@ -1327,7 +1330,7 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
 ###                ask?
 ###
 ###
-###            
+###
 ###
         self._currRec = { 'name' : recname, 'fname' : recfname }
         self._currRec['obj'] = viewer.loadInCamera( recfname, cam)
@@ -1350,11 +1353,11 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
         # cleanup mode
         mode = 'single'
         if mode == 'single' and len(self._currLig)>1:
-            # delete non-main 
+            # delete non-main
             for i in range(len(self._currLig)-1):
                 obj = self._currLig[i+1]['obj']
                 viewer.deleteInCamera(obj,cam)
-        
+
         for i in range(len(self._currLig)):
             lig = self._currLig[i]
             if (lig['name'] == ligname) and (lig['fname'] == ligfname):
@@ -1385,15 +1388,15 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
 
             main:       the principal ligand
             secondary:  multiple ligands visible
-        
+
         """
         viewer = self.app.viewer
         #representations  = {
         #style = { 'repr' : 'stick' }
 
         main = self._currLig[0]['obj']
-        viewer.mv.displaySticksAndBalls(main, log=0, cquality=0, sticksBallsLicorice='Licorice', 
-                    bquality=0, cradius=0.2, setScale=True, only=False, bRad=0.3, negate=False, 
+        viewer.mv.displaySticksAndBalls(main, log=0, cquality=0, sticksBallsLicorice='Licorice',
+                    bquality=0, cradius=0.2, setScale=True, only=False, bRad=0.3, negate=False,
                     bScale=0.0, redraw=True)
         carbons = [ "%s:::%s" % (main.name, x.name) for x in main.allAtoms if x.element == 'C']
         carbons = ";".join(carbons)
@@ -1405,24 +1408,24 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
         #if not mol.geomContainer.geoms['balls'].culling ==0:
         main.geomContainer.geoms['balls'].applyStrokes()
 
-        
+
         if len(self._currLig)<2:
             return
         for m in self._currLig[1:]:
             viewer.mv.displayLines(m, negate=False, displayBO=False, lineWidth=2, log=0, only=True)
 
-        
+
 
 
     def applyRecStyle(self, event=None):
         """ apply representation to receptor"""
-        
+
         viewer = self.app.viewer
 
         carbon_color = [[0.5176470588235295, 1.0, 0.0]]  # soft green
 
         mol = self._currRec['obj']
-    
+
         #carbons = [ "%s:%s:%s:%s" % (mol.name, x.parent.parent.name, x.parent.name, x.name) for x in mol.allAtoms if x.element == 'C']
         mol.geomContainer.geoms['lines'].protected=False
         for a in mol.allAtoms:
@@ -1463,7 +1466,7 @@ class ResViewer3D(rb.RaccoonDefaultWidget,Pmw.Group):
                 item = self._currLig[0]['obj'].geomContainer.masterGeom
             else:
                 return
-            
+
         elif target == 'rec':
             if len(self._currRec):
                 item = self._currRec['obj'].geomContainer.masterGeom
@@ -1481,7 +1484,7 @@ class LigInfoPanel(rb.RaccoonDefaultWidget,Pmw.Group):
         rb.RaccoonDefaultWidget.__init__(self, parent)
         Pmw.Group.__init__(self, self.parent, tag_text = 'Ligand properties', tag_font=self.FONTbold)
         #tk.Frame.__init__(self, self.parent)
-        self.app = app 
+        self.app = app
         self.viewertab = viewertab
         self.initIcons()
         self.makeInterface()
@@ -1532,7 +1535,7 @@ class ResultSelectorPanel(rb.RaccoonDefaultWidget,Pmw.Group):
     def __init__(self, parent, app, viewertab):
         rb.RaccoonDefaultWidget.__init__(self, parent)
         Pmw.Group.__init__(self, self.parent, tag_text = 'Results', tag_font=self.FONTbold)
-        self.app = app 
+        self.app = app
         self.viewertab = viewertab
         self.initIcons()
         self.makeInterface()
@@ -1556,7 +1559,7 @@ class ResultSelectorPanel(rb.RaccoonDefaultWidget,Pmw.Group):
     def makeInterface(self):
         """ do the widget stuff"""
         i = self.interior()
-        # 
+        #
         t = tk.Frame(i)
         tk.Button(t, text='A', image=self._ICON_selall, command=self.selectAll, **self.BORDER).pack(side='left', anchor='w', padx=0)
         tk.Button(t, text='D', image=self._ICON_seldel, command=self.selectNone, **self.BORDER).pack(side='left', anchor='w', padx=1)
@@ -1581,14 +1584,14 @@ class ResultSelectorPanel(rb.RaccoonDefaultWidget,Pmw.Group):
         lbox = self.respanel.listbox
         lbox.state_define('Checked')
         lbox.icons = {}
-        
+
         checkedIcon = lbox.icons['checkedIcon'] = \
-            tk.PhotoImage(master=lbox, 
+            tk.PhotoImage(master=lbox,
             data=('R0lGODlhDQANABEAACwAAAAADQANAIEAAAB/f3/f39',
                    '////8CJ4yPNgHtLxYYtNbIbJ146jZ0gzeCIuhQ53N',
                    'JVNpmryZqsYDnemT3BQA7'))
         unCheckedIcon = lbox.icons['unCheckedIcon'] = \
-            tk.PhotoImage(master=lbox, 
+            tk.PhotoImage(master=lbox,
             data=('R0lGODlhDQANABEAACwAAAAADQANAI',
             'EAAAB/f3/f39////8CIYyPNgHtLxYYtNbIrMZTX+l9WThwZAmSppqGmADHcnRaBQA7'))
 
@@ -1649,7 +1652,7 @@ class ResultSelectorPanel(rb.RaccoonDefaultWidget,Pmw.Group):
             d = accepted[i]
             sel = check_state[d['selected']]
             lbox.insert('end', '', t % (i+1), t % d['name'], t % d['recname'],
-                               f % d['energy'], f % d['leff'], t % d['poses'], 
+                               f % d['energy'], f % d['leff'], t % d['poses'],
                                t % d['job'], t % d['filename'])
             lbox.itemstate_forcolumn('end', 0, sel)
         lbox.see(0)
@@ -1696,11 +1699,11 @@ class ResultSelectorPanel(rb.RaccoonDefaultWidget,Pmw.Group):
 
 
 class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
-    
+
     def __init__(self, app, parent, debug=False):
         rb.TabBase.__init__(self, app, parent, debug = False)
         rb.RaccoonDefaultWidget.__init__(self, parent)
-        
+
         self.initIcons()
         self.makeInterface()
 
@@ -1728,7 +1731,7 @@ class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
     def makeInterface(self):
 
-        
+
         group = Pmw.Group(self.frame, tag_text='Results',tag_font=self.FONTbold)
         parent = group.interior()
 
@@ -1751,7 +1754,7 @@ class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
         group.pack(expand=0, fill='none',padx=3, anchor='w', side='top')
 
         f = tk.Frame(self.frame)
-        # buttons        
+        # buttons
         #tk.Button(parent, text='Save log data...', compound='left', image=self._ICON_open, #anchor ='w',
         #    justify='center', command=self.saveLog).grid(row=3,column=0,sticky='we',padx=3,pady=3)
         f.pack(anchor='w', side='top', expand=0, pady=5)
@@ -1765,15 +1768,15 @@ class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.structRec = tk.BooleanVar(value=True)
         self.structBox = tk.BooleanVar(value=True)
 
-        tk.Checkbutton(f, text = 'Ligands', font=self.FONT, variable=self.structLig, onvalue=True, 
+        tk.Checkbutton(f, text = 'Ligands', font=self.FONT, variable=self.structLig, onvalue=True,
             width=22, offvalue=False, anchor='w').pack(side='top', anchor='w', padx=5, pady=5)
-        tk.Checkbutton(f, text = 'Receptor', font=self.FONT, variable=self.structRec, onvalue=True, 
+        tk.Checkbutton(f, text = 'Receptor', font=self.FONT, variable=self.structRec, onvalue=True,
             width=22, offvalue=False, anchor='w').pack(side='top', anchor='w', padx=5, pady=5)
-        #tk.Checkbutton(f, text = 'Box', font=self.FONT, variable=self.structBox, onvalue=True, 
+        #tk.Checkbutton(f, text = 'Box', font=self.FONT, variable=self.structBox, onvalue=True,
         #    width=10, offvalue=False, anchor='w').pack(side='top', anchor='w', padx=5, pady=5)
         f.pack(side='left', anchor='w', padx=0)
 
-        
+
         f = tk.Frame(g.interior())
         tk.Button(f, text = 'Save PDB...', width=110, font=self.FONT, command = self.savePdb, compound='left',
             anchor='w', image = self._ICON_open, **self.BORDER).pack(side='top', anchor='w',padx=3)
@@ -1785,7 +1788,7 @@ class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
         g = Pmw.Group(self.frame, tag_text = 'Summary log', tag_font=self.FONTbold)
         tk.Label(g.interior(), text='CVS summary log file', width = 22, font=self.FONT).pack(side='left', anchor='w', padx=2)
-        tk.Button(g.interior(), text = 'Save summary...', width=110, font=self.FONT, command = self.saveLog, 
+        tk.Button(g.interior(), text = 'Save summary...', width=110, font=self.FONT, command = self.saveLog,
             compound='left', anchor='w', image=self._ICON_csv, **self.BORDER).pack(side='top', anchor='w',padx=3,pady=3)
 
         g.pack(anchor='w', side='top', expand=0, pady=5,padx=3)
@@ -1833,7 +1836,7 @@ class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
             return
         buff = []
         t = 'Select log filename'
-        ft = [('Comma separated values', '*.csv'), ("Any file type...", "*")] 
+        ft = [('Comma separated values', '*.csv'), ("Any file type...", "*")]
         idir = self.app._lastdir
         i = os.path.expanduser("~")
         fname = tfd.asksaveasfilename(parent=self.parent,
@@ -1890,7 +1893,7 @@ class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
         rdirname = self._listfixer(rdirname)[0]
         hf.makeDir(fullpath=rdirname)
 
-        if dolig: 
+        if dolig:
            ldirname = rdirname + os.sep + 'ligands'
            hf.makeDir(fullpath=ldirname)
 
@@ -1912,7 +1915,7 @@ class ExportTab(rb.TabBase, rb.RaccoonDefaultWidget):
                 if dorec:
                     currdir = rdirname
                     r = currfile = d['recname']
-                    if not r in receptors: 
+                    if not r in receptors:
                         receptors.append(r)
                     recfile = self.app.results[job]['rec']
                     #recfile = os.path.join(recpath,r+'.pdbqt')

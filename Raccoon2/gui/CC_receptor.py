@@ -1,17 +1,17 @@
-#       
+#
 #           AutoDock | Raccoon2
 #
 #       Copyright 2013, Stefano Forli
 #          Molecular Graphics Lab
-#  
-#     The Scripps Research Institute 
-#           _  
+#
+#     The Scripps Research Institute
+#           _
 #          (,)  T  h e
 #         _/
 #        (.)    S  c r i p p s
 #          \_
 #          (,)  R  e s e a r c h
-#         ./  
+#         ./
 #        ( )    I  n s t i t u t e
 #         '
 #
@@ -60,8 +60,8 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.resource = self.app.resource
         self.dockengine = self.app.dockengine
         #self.app.eventManager.registerListener(RaccoonEvents.SetResourceEvent, self.handleResource)
-        self.initIcons()        
-        self.makeInterface() 
+        self.initIcons()
+        self.makeInterface()
 
 
     def initIcons(self):
@@ -88,13 +88,16 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
     def makeInterface(self, resource=None):
         """ """
-        self.makeInterfaceSsh()
         if resource == 'local':
             self.makeInterfaceLocal()
         elif resource == 'ssh':
             self.makeInterfaceSsh()
         elif resource == 'opal':
-            self.makeInterfaceOpal()        
+            self.makeInterfaceOpal()
+        elif resource == 'boinc':
+            self.makeInterfaceBoinc()
+        else:
+            self.makeInterfaceSsh()
 
 
     def makeInterfaceLocal(self):
@@ -102,16 +105,19 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
         """ """
         pass
 
+    def makeInterfaceBoinc(self):
+        self.makeInterfaceSsh()
+
     def openfiles(self, event=None, files = [], quiet=False):
         """ ask for one or more rec files"""
-        title = 'Select receptor file(s), flex res...' 
+        title = 'Select receptor file(s), flex res...'
         filetypes = [("Supported ligand formats", ("*.pdbqt","*.PDBQT" )),
-                     ("PDBQT", ("*.pdbqt", "*.PDBQT")), ("Any file type...", "*")]        
+                     ("PDBQT", ("*.pdbqt", "*.PDBQT")), ("Any file type...", "*")]
         if not files:
             files = tfd.askopenfilename(parent=self.frame, title = title, filetypes = filetypes, multiple = 1)
             files = self._listfixer(files)
         if len(files):
-            self._file_checker(flist=files, quiet=quiet) 
+            self._file_checker(flist=files, quiet=quiet)
 
     def opendir(self, event=None, recursive=False):
         """ scan dir(s) optionally recursively"""
@@ -119,9 +125,9 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
         if recursive:
             title += ' recursively'
         # add a GUI feedback:
-        # - GUIvar 
+        # - GUIvar
         # - progress bar
-        # progress = tk.StringVar('Processing 
+        # progress = tk.StringVar('Processing
         #
         dirname = tfd.askdirectory(parent=self.frame, title = title, mustexist=True)
         if dirname:
@@ -154,7 +160,7 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
                 #print "ISFLEXI"
                 flex_res = " ".join(rec_data['flex_res'])
             chains = " ".join(rec_data['chains'])
-            self.recFileManager.listbox.insert('end',rec_data['name'], chains, 
+            self.recFileManager.listbox.insert('end',rec_data['name'], chains,
                 len(rec_data['residues']), flex_res, types, unk, rec_data['filename'])
             # EVENT
             # XXX TEMPORARY
@@ -164,12 +170,12 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
                 # find the index!
                 #self.tab1.ligContainer.listbox.delete(0,END)
                 # XXX Obsolete
-            #    pass        
+            #    pass
         e = RaccoonEvents.UserInputRequirementUpdate('rec')
         self.app.eventManager.dispatchEvent(e)
         self.updatereccount()
 
-    ### 
+    ###
     def deletefiles(self, nuke=False, event=None):
         if nuke == True:
             # EVENT UPDATES
@@ -204,7 +210,7 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
     def updatereccount(self):
         """update labels and list in the config panel in the """
         # update the count of accepted receptors
-        msg = 'Accepted structures [ %s ]' % len(self.app.engine.RecBook) 
+        msg = 'Accepted structures [ %s ]' % len(self.app.engine.RecBook)
         self.recGroup.configure(tag_text = msg)
         ## XXX  THIS IS THE CONFIG PANEL ENTRY
         ## self.GUI_rec_list_container.insert('end', rec_data['name'])
@@ -233,8 +239,8 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
         if not quiet:
             def close(event=None):
                 win.destroy()
-                
-            win = Pmw.Dialog(self.frame, title='Report', 
+
+            win = Pmw.Dialog(self.frame, title='Report',
                 buttons = ('Close',), command = close)
             # XXX
             bbox = win.component('buttonbox')
@@ -307,15 +313,15 @@ class ReceptorTab(rb.TabBase, rb.RaccoonDefaultWidget):
                          ]
         # make menu
         menu = rb.RacMenu(b, addrec_items, toolbar=toolb)
-        # 
-        #tk.Button(toolb, text='Settings\n&\nAlignment...', compound='top', image = self._ICON_sys, width=32, 
+        #
+        #tk.Button(toolb, text='Settings\n&\nAlignment...', compound='top', image = self._ICON_sys, width=32,
         #    font=self.FONTbold, **bset ).pack(anchor='n', side='top',pady=1)
         toolb.pack(side='left', anchor='w', expand=0, fill='y',pady=0)
 
         # files manager
         self.recFileManager = TkTreectrl.ScrolledMultiListbox(self.recGroup.interior(), bd=2)
         self.recFileManager.listbox.config(bg='white', fg='black', font=self.FONT,
-                   columns = ('name', 'chains', 'res.', 'flex_res', 
+                   columns = ('name', 'chains', 'res.', 'flex_res',
                               'atom types', 'unk.types', 'filename'),
                    selectmode='extended',
                               )

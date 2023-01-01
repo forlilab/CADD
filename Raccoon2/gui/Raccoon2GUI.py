@@ -1,17 +1,17 @@
-#       
+#
 #           AutoDock | Raccoon2
 #
 #       Copyright 2013, Stefano Forli
 #          Molecular Graphics Lab
-#  
-#     The Scripps Research Institute 
-#           _  
+#
+#     The Scripps Research Institute
+#           _
 #          (,)  T  h e
 #         _/
 #        (.)    S  c r i p p s
 #          \_
 #          (,)  R  e s e a r c h
-#         ./  
+#         ./
 #        ( )    I  n s t i t u t e
 #         '
 #
@@ -73,8 +73,8 @@ class RaccoonMaster(DebugTools.DebugObj):
     """ if racdir is specified, it can be used
         if RACDIR environmental var is set, it override this value
     """
-    
-    def __init__(self, resource='local', dockengine='vina', eventmanager=None,    
+
+    def __init__(self, resource='local', dockengine='vina', eventmanager=None,
                 racdir = None, debug=False):
         DebugTools.DebugObj.__init__(self, debug)
 
@@ -95,7 +95,7 @@ class RaccoonMaster(DebugTools.DebugObj):
 
         self.filterEngine = RaccoonFilterEngine.FilterEngine(self, debug)
 
-        # vs data source 
+        # vs data source
         self.ligand_source = [] # this will contain objects to be called
                                 # to generate ligand filenames:
                                 #   { 'lib': RaccoonLibrary, 'filters' : {} }
@@ -106,7 +106,7 @@ class RaccoonMaster(DebugTools.DebugObj):
                                # unique MD5sum id
 
         # server object to wich we're connected
-        # this should be one of RaccoonRemoteServer ('ssh'), RaccoonOpalServer ('opal') or 
+        # this should be one of RaccoonRemoteServer ('ssh'), RaccoonOpalServer ('opal') or
         # RaccoonLocalServer ('local') objects
         self.server = None
 
@@ -129,7 +129,7 @@ class RaccoonMaster(DebugTools.DebugObj):
                                                     #  }
                                        'opal': [],
                                      },
-
+                          'boinc': { },
                           'viewer': { }, # 3d viewer settings
                         }
 
@@ -179,7 +179,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         e = RaccoonEvents.ResultsImportedDeleted()
         self.eventManager.dispatchEvent(e)
         # results generator
-        # 
+        #
 
     def getDockingEngine(self):
         """ return the docking engine currently in use"""
@@ -197,6 +197,7 @@ class RaccoonMaster(DebugTools.DebugObj):
             return False
         self.readConfig()     # init client config
         self.readServerInfo() # init db of known servers
+        self.readBoincInfo()  # init boinc info
         self.loadTargetDb()   # init db of known targets
         self.loadHistory()    # init known jobs db
         self.ready = True
@@ -209,13 +210,14 @@ class RaccoonMaster(DebugTools.DebugObj):
         TARGET_PATH = 'targets'
         TMP_PATH = 'tmp'
         # file names
-        CONFIG_FILE = 'raccoon.conf'       
-        SERVER_FILE = 'servers.db'       
+        CONFIG_FILE = 'raccoon.conf'
+        SERVER_FILE = 'servers.db'
+        BOINC_FILE = 'boinc.db'
         HISTORY_FILE = 'history.log'
         TARGET_FILE = 'targetdb.log'
         # setting dirs
         self.settings['racdir'] = path   # base dir used to store all information
-        self.settings['datadir'] = path + os.sep + DATA_PATH # data files are stored here 
+        self.settings['datadir'] = path + os.sep + DATA_PATH # data files are stored here
         self.settings['dockingdir'] = self.settings['datadir'] + os.sep + DOCKING_PATH # results are stored here
         self.settings['targetdir'] = self.settings['datadir'] + os.sep + TARGET_PATH # known used docking targets stored here
         self.settings['tempdir'] = path + os.sep + TMP_PATH  # temp directory used for temporary transactions
@@ -223,12 +225,13 @@ class RaccoonMaster(DebugTools.DebugObj):
         # setting files
         self.settings['config_file'] = path + os.sep + CONFIG_FILE # Raccoon client config file
         self.settings['server_dbase'] = path + os.sep + SERVER_FILE # known saved server dbase
+        self.settings['boinc_dbase'] = path + os.sep + BOINC_FILE # known saved boinc dbase
         self.settings['history'] = path + os.sep + HISTORY_FILE # history file of all jobs
-        self.settings['target_db'] = self.settings['targetdir'] + os.sep + TARGET_FILE # store unique id for each target used in jobs 
+        self.settings['target_db'] = self.settings['targetdir'] + os.sep + TARGET_FILE # store unique id for each target used in jobs
 
     def getHistoryFilename(self):
         """ return the history of jobs run on the server
-        
+
             THIS IS ANOTHER BASIC FUNCTION FOR THE RACCOON CORE SERVER
         """
         return self.settings['history']
@@ -236,7 +239,7 @@ class RaccoonMaster(DebugTools.DebugObj):
 
     def _checkdirs(self, autocreate =True):
         """ check and create necessary raccoon dirs"""
-        dirs = [  self.settings['racdir'], self.settings['datadir'] , 
+        dirs = [  self.settings['racdir'], self.settings['datadir'] ,
                   self.settings['tempdir'], self.settings['dockingdir'],
                   self.settings['targetdir'] ]
 
@@ -252,8 +255,9 @@ class RaccoonMaster(DebugTools.DebugObj):
 
     def _checkfiles(self, autocreate=True):
         """ check and create necessary raccoon files"""
-        files = [ self.settings['config_file'], self.settings['history'], 
-                self.settings['server_dbase'] , self.settings['target_db'] ]
+        files = [ self.settings['config_file'], self.settings['history'],
+                self.settings['server_dbase'] , self.settings['target_db'],
+                self.settings['boinc_dbase']]
         for f in files:
             if not os.path.isfile(f):
                 if autocreate:
@@ -292,7 +296,7 @@ class RaccoonMaster(DebugTools.DebugObj):
 
 
     def getTargetDir(self):
-        """ return the directory where all docking targets used in 
+        """ return the directory where all docking targets used in
             docking are going to be saved """
         return self.settings['targetdir']
 
@@ -317,6 +321,9 @@ class RaccoonMaster(DebugTools.DebugObj):
         jobdir = os.sep.join([ datadir, job[0], job[1], job[2] ] )
         return jobdir
 
+    def getBoincInfoFile(self):
+        """ return the config file name """
+        return self.settings['boinc_dbase']
 
     def getServerInfoFile(self):
         """ return the database file where server info are stored"""
@@ -330,7 +337,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         return self.settings['servers'][_type]
 
     def addServer(self, _type, name, info={}):
-        """ add a new server connection to the dbase of 
+        """ add a new server connection to the dbase of
             known connections
         """
         self.settings['servers'][_type][name] = info
@@ -338,7 +345,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         # self.readServerInfo()
 
     def delServer(self, _type, name):
-        """ remove a server connection from the dbase of 
+        """ remove a server connection from the dbase of
             known connections
         """
         del self.settings['servers'][_type][name]
@@ -402,6 +409,20 @@ class RaccoonMaster(DebugTools.DebugObj):
                             srv['_save_passwd_'] = None
             self.settings['servers'] = srv_db
 
+    def saveBoincInfo(self, fname=None):
+        """save the boinc db"""
+        if fname==None:
+            fname = self.getBoincInfoFile()
+        boinc_db = self.settings['boinc']
+        hf.writejson(fname, boinc_db, compression=True)
+
+    def readBoincInfo(self, fname=None):
+        """read the boinc db"""
+        if fname==None:
+            fname = self.getBoincInfoFile()
+        data = hf.readjson(fname, compression=True)
+        if data:
+            self.settings['boinc'] = data
 
     def loadTargetDb(self, fname=None):
         """ read the database where known used targets
@@ -431,7 +452,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         self.history = self.readJson(fname)
         if self.history == False:
             self.dprint("empty/unreadable history file")
-            self.history = {}        
+            self.history = {}
 
     def saveHistory(self):
         """ """
@@ -442,11 +463,11 @@ class RaccoonMaster(DebugTools.DebugObj):
 
 
     def writeJson(self, fname, data, mode='w', compression=False):
-        """ write a python data type (dict or list) 
+        """ write a python data type (dict or list)
             into a JSON file
 
             optional Zlib compression available
-            
+
             # COMPRESSION
             http://www.blog.pythonlibrary.org/2010/10/20/\
                 downloading-encrypted-and-compressed-files-with-python/
@@ -473,9 +494,9 @@ class RaccoonMaster(DebugTools.DebugObj):
 
 
     def readJson(self, fname, compression = False):
-        """ read a json data file and perform the 
+        """ read a json data file and perform the
             opportune conversions to restore python types
-            
+
             supported types are dict and list
 
             optional Zlib compression available
@@ -489,7 +510,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         except:
             self.dprint("Error reading JSON file [%s] : [%s]" % (fname, sys.exc_info()[1]))
             return False
-            
+
         data = fp.read()
         fp.close()
         if compression:
@@ -537,16 +558,16 @@ class RaccoonMaster(DebugTools.DebugObj):
         else:
             if alias in self.knownTargets[fingerp]:
                 self.dprint("known structure, skipping registration")
-                return (fingerp, alias) 
+                return (fingerp, alias)
             else:
                 self.knownTargets[fingerp].append(alias)
                 self.dprint("alias [%s] added to db entry [%s]" % (alias, fingerp))
         self.saveTargetDb()
-        return (fingerp, alias) 
+        return (fingerp, alias)
 
     def unregisterTarget(self, targetId, alias=None):
         """ remove target info from db:
-            
+
             if not alias == None:
                 remove only this alias from db
             else:
@@ -568,10 +589,10 @@ class RaccoonMaster(DebugTools.DebugObj):
             return False
         del self.knownTargets[targetId][alias]
         return True
-    
+
     def getTargetCacheFile(self, targetId, alias=None):
         """ copy the targetId receptor in the TEMP directory
-            and optionally name it 'alias' (default: first 
+            and optionally name it 'alias' (default: first
             name in record)
             FIXME: currently works only with PDBQT files
         """
@@ -589,9 +610,9 @@ class RaccoonMaster(DebugTools.DebugObj):
             return (False, e)
         return (True, dest)
 
-        
+
     def registerJob(self, submission):
-        """  register a job in self.history 
+        """  register a job in self.history
             and update the server history file
         """
         #print "CALLED REGISTERJOB", submission
@@ -622,7 +643,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         self.dprint("PRJ POOL [%s]" % ",".join(prj_pool) )
         for p in prj_pool:
             if not p in self.history.keys():
-                self.dprint("*NOT FOUND* (no projects with this name)") 
+                self.dprint("*NOT FOUND* (no projects with this name)")
                 return ()
             if exp == None:
                 exp_pool = self.history[p].keys()
@@ -631,18 +652,18 @@ class RaccoonMaster(DebugTools.DebugObj):
             self.dprint("EXP POOL [%s]" % ",".join(exp_pool) )
             for e in exp_pool:
                 if not e in self.history[p].keys():
-                    self.dprint("*NOT FOUND* (no experiments with this name)") 
+                    self.dprint("*NOT FOUND* (no experiments with this name)")
                     return ()
                 else:
                     if name in self.history[p][e].keys():
-                        found = ( p, e, name ) 
+                        found = ( p, e, name )
                         self.dprint("*FOUND* [%s|%s|%s]" % found)
                         return found
-        self.dprint("*NOT FOUND*") 
+        self.dprint("*NOT FOUND*")
         return ()
 
     def updateJobHistory(self, name, prj=None, exp=None, properties={}):
-        """ update the job info using properties provided 
+        """ update the job info using properties provided
         """
         self.dprint("Request to update job [%s|%s|%s]" % (prj, exp,name))
         self.dprint("Properties :", properties )
@@ -653,7 +674,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         self.eventManager.dispatchEvent(e)
 
     def connectSshServerSafe(self, server, data=None): #, usekeys=False):
-        """ 
+        """
         """
         if isinstance(self, RaccoonGUI):
             self.SetupTab.chooseServer(server)
@@ -719,10 +740,10 @@ class RaccoonMaster(DebugTools.DebugObj):
         from copy import deepcopy
         return deepcopy(vs)
         pass
-        
+
     def copyDict(self, dictionary):
         """ perform a deepcopy of the dictionary"""
-        return 
+        return
 
     def syncServerHistory(self, event=None):
         """ scan the server history and sync the content
@@ -738,7 +759,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         remote = self.server.history
         #print "\n\nMATCHER-1", self.history == self.server.history
         # these values could mismatch even with identical jobs
-        skip = ['status', 'date', 'downloaded', 'summary'] 
+        skip = ['status', 'date', 'downloaded', 'summary']
         l_prj = local.keys()
         r_prj = remote.keys()
         to_be_added = []
@@ -796,8 +817,8 @@ class RaccoonMaster(DebugTools.DebugObj):
 
 
     def newJobEvents(self, newjobs=[]):
-        """ receive a pool of new jobs to be 
-            added to the history and triggers 
+        """ receive a pool of new jobs to be
+            added to the history and triggers
             a UpdateJobHistory event for each of them
         """
         self.dprint("Called with newjobs = %s" % newjobs)
@@ -835,7 +856,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         sourcefile = '/'.join([sourcedir, filename])
         destdir = self.getTempDir()
         destfile = destdir + os.sep + filename #$os.path.join([destdir, filename])
-        files = [ (sourcefile,destfile) ] 
+        files = [ (sourcefile,destfile) ]
         # copy the remote receptor file to local temp directory
         problems = self.server.ssh.getfiles(files)
         if len(problems):
@@ -850,7 +871,7 @@ class RaccoonMaster(DebugTools.DebugObj):
             to find duplicates
         """
         # these values could mismatch even with identical jobs
-        skip = ['status', 'date', 'downloaded', 'summary'] 
+        skip = ['status', 'date', 'downloaded', 'summary']
         for k1, i1 in job1.items():
             if not k1 in skip:
                 try:
@@ -859,7 +880,7 @@ class RaccoonMaster(DebugTools.DebugObj):
                 except:
                     return False
         return True
-        
+
 
 
     def disconnectSshServer(self):
@@ -869,7 +890,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         self.server.disconnect()
         self.server = None
         event = RaccoonEvents.ServerDisconnection()
-        self.eventManager.dispatchEvent(event)        
+        self.eventManager.dispatchEvent(event)
 
     def getServerInfo(self, name):
         """ retrieve server info from its name """
@@ -909,15 +930,15 @@ class RaccoonMaster(DebugTools.DebugObj):
         tag = job_info['tag']
         for rec in self.engine.receptors():
             n = service.processor.makeVsName(recname=rec, ligsource=self.ligand_source, tag = tag)
-            if server.findJob(prj, exp, n): 
+            if server.findJob(prj, exp, n):
                 report['server_duplicates'].append([prj, exp, rec, n])
             else:
                 pass
-            if self.findJob(prj, exp, n): 
+            if self.findJob(prj, exp, n):
                 report['local_duplicates'].append([prj, exp, rec, n])
         return report
 
-    
+
     def submitSsh(self, job_info, duplicates='skip', cb=None):
         """ job_info = { 'prj' : xxx, 'exp' : xxx, 'tag' : xxx, }
         """
@@ -934,7 +955,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         # check for duplicate job names XXX FIXME Make this a separate function
         for rec in self.engine.receptors():
             n = service.processor.makeVsName(recname=rec, ligsource=self.ligand_source, tag = tag)
-            if server.findJob(prj, exp, n): 
+            if server.findJob(prj, exp, n):
                 if duplicates == 'skip': # we don't save the rec + name
                     continue
                 elif duplicates == 'rename':
@@ -946,18 +967,18 @@ class RaccoonMaster(DebugTools.DebugObj):
                 elif duplicates == 'overwrite': # we delete the vs dir, 'cause we assume it's there
                     # FIXME ? remove also local job info?
                     self.unregisterJob(name = n, prj = prj, exp=exp,  removefiles=True)
-                    server.unregisterJob(name = n, prj = prj, exp=exp, 
+                    server.unregisterJob(name = n, prj = prj, exp=exp,
                             removefiles=True, kill=True)
                 submission_input.append([rec, n])
             else:
                 submission_input.append([rec, n])
-            if self.findJob(prj, exp, n): 
+            if self.findJob(prj, exp, n):
                 report['local_duplicates'].append([prj, exp, rec, n])
         ### FIXME end of future separate function
 
         if len(submission_input) == 0:
             return submissions
-    
+
         status, expdir = server.makeExperimentDir(job_info, _type = 'vs')
         if not status:
             print "FATAL ERROR:", expdir
@@ -968,18 +989,18 @@ class RaccoonMaster(DebugTools.DebugObj):
             data = job_info.copy()
             data['name'] = name
             # register the receptor in target dbase
-            submission_data = service.processor.start(app = self, engine = self.engine, 
+            submission_data = service.processor.start(app = self, engine = self.engine,
                                          jobinfo = data,
-                                         expdir=expdir, 
-                                         ligsource=self.ligand_source, 
-                                         recname=rec, 
+                                         expdir=expdir,
+                                         ligsource=self.ligand_source,
+                                         recname=rec,
                                          callback = cb)
             if submission_data['error'] == None:
                 submissions.append(submission_data['info'])
                 # register job in local history
                 self.registerJob(submission_data['info'])
                 submissions.append(submission_data['info'])
-                e = RaccoonEvents.UpdateJobHistory(prj=prj, exp=exp, name=name, 
+                e = RaccoonEvents.UpdateJobHistory(prj=prj, exp=exp, name=name,
                     jtype='ssh', properties = submission_data['info'][prj][exp][name])
                 self.eventManager.dispatchEvent(e)
         #self.debug = False
@@ -994,7 +1015,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         """ unregister single vs jobs
             from the CLIENT and update the history file
 
-            by default associated result files, if any, will be deleted 
+            by default associated result files, if any, will be deleted
             (removefiles option) and running jobs killed (kill option)
         """
         # check that status is useful
@@ -1042,7 +1063,7 @@ class RaccoonMaster(DebugTools.DebugObj):
         self.dprint("Prj [%s] is now empty, deleting" % prj)
         del self.history[prj]
         return True
-    # XXX 
+    # XXX
 
 
     def deleteResults(self, resname=None):
@@ -1064,14 +1085,14 @@ class RaccoonMaster(DebugTools.DebugObj):
         self.eventManager.dispatchEvent(e)
 
     def importResults(self, data, name, path, rec=None):
-        """ add results contained in {data} to 
-            the current session; the format is { 'name' : { 'results : {data}, 
+        """ add results contained in {data} to
+            the current session; the format is { 'name' : { 'results : {data},
                                                             'path' : path, ...  } }
             TODO check for duplicates?
         """
         for n, d in data.items():
             d['selected'] = False
-        
+
         if rec == None:
             lig = data.keys()[0]
             recname = data[lig]['data'][0]['recname']
@@ -1165,7 +1186,7 @@ class RaccoonMaster(DebugTools.DebugObj):
                      }
                 accepted.append(a)
         return sorted(accepted, key=itemgetter('energy'))
-            
+
     def selectedResults(self):
         """ return selected results"""
         return [ a for a in self.acceptedResults() if a['selected'] ]
@@ -1176,7 +1197,7 @@ class RaccoonMaster(DebugTools.DebugObj):
 class RaccoonGUI(RaccoonMaster, RaccoonBasics.RaccoonDefaultWidget):
     """
     top object for RaccoonGUI app
-    
+
     event manager is an external instance of an EventHandler class
     """
     def __init__(self, parent=None, resource = 'local', dockengine='vina', eventmanager=None,
@@ -1198,7 +1219,7 @@ class RaccoonGUI(RaccoonMaster, RaccoonBasics.RaccoonDefaultWidget):
         self.notebook = Pmw.NoteBook(self.parent)
         self.tabs = {}
         for tab in ['Setup', 'Ligands', 'Receptors', 'Config', 'Job manager',
-                    'Analysis']: 
+                    'Analysis']:
             self.tabs[tab] = self.notebook.add(tab)
         self.notebook.pack(expand=1, fill='both')
         #self.notebook.setnaturalsize(self.tabs.keys())
@@ -1209,7 +1230,7 @@ class RaccoonGUI(RaccoonMaster, RaccoonBasics.RaccoonDefaultWidget):
             entry_relief='groove',
             entry_background='white',
             labelpos='w',
-            label_text='Status:') 
+            label_text='Status:')
         self.statusbar.pack(fill='x', expand=0,padx=3,pady=3,anchor='s',side='bottom')
 
         # create setup tab 1
@@ -1233,7 +1254,7 @@ class RaccoonGUI(RaccoonMaster, RaccoonBasics.RaccoonDefaultWidget):
         # create analysis tab 6
         # hack to trigger optimal Analysis tab size
         # only the first time it is shown
-        self._firstclick = True 
+        self._firstclick = True
         self.analysisTab = AnalysisTab(self, self.tabs['Analysis'])
         cb = CallbackFunction( self.switchCams, self.analysisTab.visualTab.camera_name )
         self.notebook.component('Analysis-tab').bind('<ButtonRelease-1>', cb)
@@ -1293,7 +1314,7 @@ if __name__ == '__main__':
     rac = RaccoonGUI(parent=root)
     #rac.settings['servers']['ssh']['Garibaldi (Scripps only)'] = { 'address': 'garibaldi.scripps.edu',
     #    'username' : 'forli', 'password' : None, 'pkey': None}
-    if len(sys.argv) > 1: 
+    if len(sys.argv) > 1:
         for i in sys.argv:
             if i == '-i':
                 print "INTERACTIVE"
@@ -1303,7 +1324,7 @@ if __name__ == '__main__':
                 sys.stderr = sys.__stderr__
                 #print "HERE", rac
                 import code
-                try: # hack to really exit code.interact 
+                try: # hack to really exit code.interact
                     mod = __import__('__main__')
                     code.interact( 'Pmv Interactive Shell', local=mod.__dict__)
                 except:
@@ -1313,7 +1334,7 @@ if __name__ == '__main__':
         root.mainloop()   #root.mainloop()
 
 
-        
+
 
 
 

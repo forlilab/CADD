@@ -333,7 +333,10 @@ class BoincService:
 
     def _do_prepared_request(self, request):
         """ do a request to the BOINC service """
-        context = ssl.create_default_context()
+        try:
+            context = ssl.create_default_context()
+        except AttributeError:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
 

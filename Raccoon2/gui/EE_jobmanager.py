@@ -1,17 +1,17 @@
-#       
+#
 #           AutoDock | Raccoon2
 #
 #       Copyright 2013, Stefano Forli
 #          Molecular Graphics Lab
-#  
-#     The Scripps Research Institute 
-#           _  
+#
+#     The Scripps Research Institute
+#           _
 #          (,)  T  h e
 #         _/
 #        (.)    S  c r i p p s
 #          \_
 #          (,)  R  e s e a r c h
-#         ./  
+#         ./
 #        ( )    I  n s t i t u t e
 #         '
 #
@@ -39,20 +39,24 @@ import RaccoonProjManTree
 import os, Pmw
 from PmwOptionMenu import OptionMenu as OptionMenuFix
 import Tkinter as tk
+import TkTreectrl
 import tkMessageBox as tmb
 import tkFileDialog as tfd
 from PIL import Image, ImageTk
 # mgl modules
 from mglutil.events import Event, EventHandler
 from mglutil.util.callback import CallbackFunction # as cb
+import hashlib
+import zipfile
+import StringIO
 
-#import EF_resultprocessor 
+#import EF_resultprocessor
 
 
 
 class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
     """ populate and manage the job manager tab """
-    
+
     def __init__(self, app, parent, debug=False):
         # get
         rb.TabBase.__init__(self, app, debug)
@@ -63,14 +67,13 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.app.eventManager.registerListener(RaccoonEvents.SetResourceEvent, self.handleResource) # set resource
         self.app.eventManager.registerListener(RaccoonEvents.ServerConnection, self._updateRequirementsSsh) # open connection
         #self.app.eventManager.registerListener(RaccoonEvents.UpdateJobHistory, self.updateJobTree)  # job history update
-        self.app.eventManager.registerListener(RaccoonEvents.ServiceSelected, self.updateRequirements) # docking service is selected 
+        self.app.eventManager.registerListener(RaccoonEvents.ServiceSelected, self.updateRequirements) # docking service is selected
         self.app.eventManager.registerListener(RaccoonEvents.UserInputRequirementUpdate, self.updateRequirements) # data input (lig,rec...)
         self.app.eventManager.registerListener(RaccoonEvents.SearchConfigChange, self.updateRequirements) # search config change (box)
-        self._buildjobman(self.parent)
 
-    def _buildjobman(self, target):
+    def _buildjobman(self):
         """ build the job manager tree"""
-        pgroup = Pmw.Group(target, tag_text = 'Jobs', tag_font=self.FONTbold)
+        pgroup = Pmw.Group(self.frame, tag_text = 'Jobs', tag_font=self.FONTbold)
         #tk.Button(pgroup.interior(), text='Refresh', image='self.'
         self.jobtree = RaccoonProjManTree.VSresultTree(pgroup.interior(), app = self.app, iconpath=self.iconpath)
         pgroup.pack(expand=1, fill='both', anchor='n', side='bottom')
@@ -83,11 +86,19 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
     def initIcons(self):
         """ initialize the icons for the interface"""
-        self.iconpath = icon_path = CADD.Raccoon2.ICONPATH 
+        self.iconpath = icon_path = CADD.Raccoon2.ICONPATH
         f = icon_path + os.sep + 'system.png'
         self._ICON_sys = ImageTk.PhotoImage(Image.open(f))
         f = icon_path + os.sep + 'submit.png'
         self._ICON_submit = ImageTk.PhotoImage(Image.open(f))
+        f = icon_path + os.sep + 'refresh.png'
+        self._ICON_refresh = ImageTk.PhotoImage(Image.open(f))
+        f = icon_path + os.sep + 'removex.png'
+        self._ICON_removex = ImageTk.PhotoImage(Image.open(f))
+        f = icon_path + os.sep + 'remove.png'
+        self._ICON_remove = ImageTk.PhotoImage(Image.open(f))
+        f = icon_path + os.sep + 'package.png'
+        self._ICON_package = ImageTk.PhotoImage(Image.open(f))
 
 
 
@@ -104,6 +115,8 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
             self.setClusterResource()
         elif resource == 'opal':
             self.setOpalResource()
+        elif resource == 'boinc':
+            self.setBoincResource()
 
     def setLocalResource(self):
         #self.frame.pack_forget()
@@ -138,8 +151,8 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.reqConn.grid(row=1,column=2, sticky='e')
         cb = CallbackFunction(self.switchtab, 'Setup')
         self.reqConn.bind('<Button-1>', cb)
-        
-        # XXX self.GUI_LigStatus.bind('<Button-1>', lambda x : self.notebook.selectpage('Ligands')) 
+
+        # XXX self.GUI_LigStatus.bind('<Button-1>', lambda x : self.notebook.selectpage('Ligands'))
 
         # docking service
         # ligands
@@ -179,13 +192,15 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         #self.reqSched.bind('<Button-1>', cb)
 
         # submission
-        self.SubmitButton = tk.Button(f, text = 'Submit...', image=self._ICON_submit, 
+        self.SubmitButton = tk.Button(f, text = 'Submit...', image=self._ICON_submit,
             font=self.FONT, compound='left',state='disabled', command=self.submit, **self.BORDER)
         self.SubmitButton.grid(row=20, column=1, sticky='we', columnspan=3, padx=4, pady=3)
 
         self.group.pack(fill='none',side='top', anchor='w', ipadx=5, ipady=5)
 
-        self.frame.pack(expand=0, fill='x',anchor='n')
+        self._buildjobman()
+
+        self.frame.pack(expand=1, fill='both',anchor='n')
         self._updateRequirementsSsh()
 
         #print "Raccoon GUI job manager is now on :", self.app.resource
@@ -204,6 +219,55 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         self.frame.pack(expand=1, fill='both')
         #print "Raccoon GUI job manager is now on :", self.app.resource
 
+    def setBoincResource(self):
+        bset = { 'bg' : '#969b9d'  } # 'width' : 22, 'height': 22, 'relief' : 'raised'}
+        bset = {}
+        bset.update(self.BORDER)
+        self.resetFrame()
+
+        self.group_new_batch = Pmw.Group(self.frame, tag_text = 'New docking batch', tag_font=self.FONTbold)
+        f = self.group_new_batch.interior()
+        self.ligLabel = tk.Label(f, text='Ligands: %s' % len(self.app.engine.LigBook))
+        self.ligLabel.pack(anchor='w', side='left',padx=1)
+        self.recLabel = tk.Label(f, text='Receptors: %s' % len(self.app.engine.RecBook))
+        self.recLabel.pack(anchor='w', side='left',padx=1)
+        self.tasksLabel = tk.Label(f, text='Tasks:')
+        self.tasksLabel = tk.Label(f, text='Tasks: %s' % (len(self.app.engine.LigBook) * len(self.app.engine.RecBook)))
+        self.tasksLabel.pack(anchor='w', side='left',padx=1)
+        self.SubmitButton = tk.Button(f, text = 'Submit', image=self._ICON_submit,
+            font=self.FONT, compound='left', state='disabled', command=self.submit_boinc, **self.BORDER)
+        self.SubmitButton.pack(anchor='w', side='left',padx=0)
+        self.group_new_batch.pack(fill='x',side='top', anchor='w', ipadx=5, ipady=5)
+
+        self.group_batches = Pmw.Group(self.frame, tag_text = 'Batches', tag_font=self.FONTbold)
+        f = self.group_batches.interior()
+
+        toolb = tk.Frame(f)
+        if self.sysarch == 'Windows':
+            bwidth = 54
+        else:
+            bwidth = 32
+        b = tk.Button(toolb, text='Refresh', compound='top', image = self._ICON_refresh, command=self.refreshBatchesBoinc, width=bwidth, font=self.FONTbold, **bset )
+        b.pack(anchor='n', side='top')
+        b = tk.Button(toolb, text='Abort', compound='top', image = self._ICON_removex, command=self.abortBatchBoinc, width=bwidth, font=self.FONTbold, **bset )
+        b.pack(anchor='n', side='top')
+        b = tk.Button(toolb, text='Download', compound='top', image = self._ICON_package, command=self.downloadResultsBoinc, width=bwidth, font=self.FONTbold, **bset )
+        b.pack(anchor='n', side='top')
+        b = tk.Button(toolb, text='Delete', compound='top', image = self._ICON_remove, command=self.retireBatchBoinc, width=bwidth, font=self.FONTbold, **bset )
+        b.pack(anchor='n', side='top')
+        toolb.pack(side='left', anchor='w', expand=0, fill='y',pady=0)
+
+        self.batchManager = TkTreectrl.ScrolledMultiListbox(f, bd=2)
+        self.batchManager.listbox.config(bg='white', fg='black', font=self.FONT,
+                   columns = ('id', 'name', 'state', 'done', 'jobs', 'failed jobs'),
+                   selectmode='extended',
+                              )
+        self.batchManager.pack(anchor='w', side='left', expand=1, fill='both')
+
+        self.group_batches.pack(fill='both',side='top', anchor='w', expand='1', ipadx=5, ipady=5)
+
+        self.frame.pack(expand=1, fill='both', anchor='n')
+
     def updateRequirements(self, event=None):
         """ update submission requirements """
         if self.app.resource == 'local':
@@ -212,9 +276,10 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
             self._updateRequirementsSsh(event)
         elif self.app.resource == 'opal':
             self._updateRequirementsOpal(event)
-    
+        elif self.app.resource == 'boinc':
+            self._updateRequirementsBoinc(event)
+
     def submit(self, event=None, suggest={}):
-        """ find out which EVENT should be triggered and how"""
         jsub = JobSubmissionInterface(self.frame, jmanager=self.jobtree, app = self.app, suggest=suggest)
         job_info = jsub.getinfo()
         self.app.setBusy()
@@ -278,8 +343,230 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
             self.app.setReady()
             return False
 
+    def abortBatchBoinc(self):
+        """ abort a batch of jobs on boinc """
+        if tmb.askyesno('Abort batch', 'Are you sure you want to abort the selected batch(es)?\nAll jobs in the batch(es) will be aborted.'):
+            sel = self.batchManager.listbox.curselection()
+            if len(sel) == 0:
+                return
+            for s in sel:
+                batch_id = self.batchManager.listbox.get(s)[0][0]
+                self._abort_batch_boinc(batch_id)
+            self.refreshBatchesBoinc()
+
+    def retireBatchBoinc(self):
+        """ retire a batch of jobs on boinc """
+        if tmb.askyesno('Delete batch', 'Are you sure you want to delete the selected batch(es)?\nAll results will be removed.'):
+            sel = self.batchManager.listbox.curselection()
+            if len(sel) == 0:
+                return
+            for s in sel:
+                batch_id = self.batchManager.listbox.get(s)[0][0]
+                self._retire_batch_boinc(batch_id)
+            self.refreshBatchesBoinc()
+
+    def refreshBatchesBoinc(self):
+        """ get the list of batches from the boinc server """
+        self.batchManager.listbox.delete(0, 'end')
+
+        if self.app.boincService.isAuthenticated() == False:
+            tmb.showerror('Submission', 'You are not authenticated to the BOINC server. Please login first.')
+            return
+
+        result, message, batches = self.app.boincService.queryBatches()
+        if result == False:
+            tmb.showerror('Submission', message)
+            return False
+
+        for batch in batches:
+            if batch.state == '0':
+                state = 'New'
+            elif batch.state == '1':
+                state = 'In progress'
+            elif batch.state == '2':
+                state = 'Completed'
+            elif batch.state == '3':
+                state = 'Aborted'
+            elif batch.state == '4':
+                state = 'Retired'
+            else:
+                state = 'Unknown'
+            done = str(float(batch.fraction_done) * 100) + '%'
+            self.batchManager.listbox.insert('END', batch.id, batch.name, state, done, batch.njobs, batch.nerror_jobs)
+
+    def submit_boinc(self):
+        """ submit a batch of jobs to the boinc server"""
+        if self.app.boincService.isAuthenticated() == False:
+            tmb.showerror('Submission', 'You are not authenticated to the BOINC server. Please login first.')
+            return False
+
+        func = self._submit_batch_boinc
+        func_kwargs = { }
+        progressWin = rb.ProgressDialogWindowTk(parent = self.frame,
+                function = func, func_kwargs = func_kwargs,
+                title ='Jobs Processing', message = "Submitting jobs to BOINC server...",
+                operation = 'submitting jobs',
+                image = None, autoclose=True, progresstype='percent')
+        progressWin.start()
+        self.app.setReady()
+        if progressWin._STOP or (not progressWin._COMPLETED) or progressWin.getOutput() == False:
+            return False
+
+        tmb.showinfo('Submission', 'Jobs submitted successfully.')
+        self.refreshBatchesBoinc()
+
+        return True
+
+    def downloadResultsBoinc(self):
+        """ download the results of a batch of jobs from the boinc server"""
+        if not tmb.askyesno('Download', 'Are you sure you want to download results of the selected batch(es)?'):
+            return
+        outdir = tfd.askdirectory(parent=self.frame, title='Select a directory to save the results')
+        if not outdir:
+            return
+
+        sel = self.batchManager.listbox.curselection()
+        if len(sel) == 0:
+            return
+        for s in sel:
+            batch_id = self.batchManager.listbox.get(s)[0][0]
+
+            func = self._download_results_boinc
+            func_kwargs = { 'batch_id':batch_id, 'outdir':outdir }
+            progressWin = rb.ProgressDialogWindowTk(parent = self.frame,
+                    function = func, func_kwargs = func_kwargs,
+                    title ='Results Downloading', message = "Downloading results from the BOINC server...",
+                    operation = 'downloading results',
+                    image = None, autoclose=True, progresstype=None)
+            progressWin.start()
+            self.app.setReady()
+            if progressWin._STOP or (not progressWin._COMPLETED) or progressWin.getOutput() == False:
+                return False
+
+            zipfilename = progressWin.getOutput()
+            func = self._unzip_results_boinc
+            func_kwargs = { 'zipfilename':zipfilename, 'outdir':outdir }
+            progressWin = rb.ProgressDialogWindowTk(parent = self.frame,
+                    function = func, func_kwargs = func_kwargs,
+                    title ='Results Unzipping', message = "Unzipping downloaded results...",
+                    operation = 'unzipping results',
+                    image = None, autoclose=True, progresstype='percent')
+            progressWin.start()
+            self.app.setReady()
+            if progressWin._STOP or (not progressWin._COMPLETED) or progressWin.getOutput() == False:
+                return False
+
+            os.remove(zipfilename)
+            tmb.showinfo('Download', 'Results downloaded successfully.')
+
+    def _unzip_results_boinc(self, zipfilename, outdir, GUI = None, stopcheck = None, showpercent=None):
+        """ unzip the results of a batch of jobs """
+        zip_file = zipfile.ZipFile(zipfilename)
+        namelist = zip_file.namelist()
+        total = len(namelist)
+        processed = 0
+        for name in namelist:
+            if stopcheck != None and stopcheck():
+                zip_file.close()
+                return False
+            if showpercent != None:
+                showpercent(hf.percent(processed, total))
+            if GUI != None:
+                GUI.update()
+            buff = zip_file.read(name)
+            sub_zip_file = zipfile.ZipFile(StringIO.StringIO(buff))
+            sub_zip_file.extractall(outdir)
+            sub_zip_file.close()
+            processed += 1
+        zip_file.close()
+        if showpercent != None:
+                showpercent(hf.percent(total, total))
+        return True
+
+    def _download_results_boinc(self, batch_id, outdir, GUI = None, stopcheck = None, showpercent=None):
+        result, message = self.app.boincService.downloadResults(batch_id, outdir)
+        if result == False:
+            tmb.showerror('Download', message)
+            return False
+        return message
+
+    def _abort_batch_boinc(self, batch_id):
+        result, message = self.app.boincService.abortBatch(batch_id)
+        if result == False:
+            tmb.showerror('Submission', message)
+            return False
+        return True
+
+    def _retire_batch_boinc(self, batch_id):
+        result, message = self.app.boincService.retireBatch(batch_id)
+        if result == False:
+            tmb.showerror('Submission', message)
+            return False
+        return True
+
+    def _submit_batch_boinc(self, GUI = None, stopcheck = None, showpercent=None):
+        total = 2 + len(self.app.engine.ligands()) * len(self.app.engine.receptors())
+
+        result, message, batch_id = self.app.boincService.createBatch()
+        if result == False:
+            tmb.showerror('Submission', message)
+            return False
+
+        # update progress
+        if showpercent != None:
+            showpercent(hf.percent(1, total))
+
+        processed = 0
+        processed_files = []
+        for rec in self.app.engine.receptors():
+            for lig in self.app.engine.ligands():
+                # check stop
+                if stopcheck != None and stopcheck():
+                    return False
+                # update progress
+                if showpercent != None:
+                    showpercent(hf.percent(processed + 1, total))
+                # update GUI
+                if GUI != None:
+                    GUI.update()
+
+                json_document = self.app.engine.generateBoincTaskJson(rec, lig, self.app.dockengine, self.app.configTab)
+                if json_document == None:
+                    continue
+                zip_file_path = self.app.engine.generateBoincTaskZip(rec, lig, json_document)
+                json_document_hash = str(hashlib.md5(json_document).hexdigest())
+                boinc_file_name = ('%s_%s_%s.zip') % (batch_id, processed, json_document_hash)
+                processed_files.append(boinc_file_name)
+
+                if not self.app.boincService.uploadFile(batch_id, zip_file_path, boinc_file_name):
+                    tmb.showerror('Submission', 'Error uploading files to BOINC server.')
+                    os.remove(zip_file_path)
+                    self._abort_batch_boinc(batch_id)
+                    self._retire_batch_boinc(batch_id)
+                    return False
+
+                os.remove(zip_file_path)
+                processed = processed + 1
+
+        # update progress
+        if showpercent != None:
+            showpercent(hf.percent(processed + 1, total))
+
+        result, message = self.app.boincService.submitBatch(batch_id, processed_files)
+        if result == False:
+            self._abort_batch_boinc(batch_id)
+            self._retire_batch_boinc(batch_id)
+            tmb.showerror('Submission', message)
+            return False
+
+        # update progress
+        if showpercent != None:
+            showpercent(hf.percent(total, total))
+
+        return True
+
     def _updateRequirementsLocal(self, event=None):
-        """ update the check for requirements 
+        """ update the check for requirements
             of local submission
         """
         _type = event._type
@@ -287,7 +574,7 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
 
 
     def _updateRequirementsSsh(self, event=None):
-        """ update the check for requirements 
+        """ update the check for requirements
             of ssh submission
         """
         g = 'black'
@@ -319,8 +606,8 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
         else:
             missing = True
             self.reqService.configure(text = d, bg = red)
-        
-        # ligand 
+
+        # ligand
         if len(self.app.ligand_source):
             libnames = ",".join([x['lib'].name() for x in self.app.ligand_source])
             t = "library selected (%s)" % libnames
@@ -354,11 +641,26 @@ class JobManagerTab(rb.TabBase, rb.RaccoonDefaultWidget):
             self.SubmitButton.configure(state='normal')
 
     def _updateRequirementsOpal(self, event=None):
-        """ update the check for requirements 
+        """ update the check for requirements
             of opal submission
         """
         _type = event._type
         pass
+
+    def _updateRequirementsBoinc(self, event=None):
+        """ update the check for requirements
+            of boinc submission
+        """
+        ligCount = len(self.app.engine.LigBook)
+        recCount = len(self.app.engine.RecBook)
+        tasksCount = ligCount * recCount
+        self.ligLabel.configure(text = 'Ligands: %s' % ligCount)
+        self.recLabel.configure(text = 'Receptors: %s' % recCount)
+        self.tasksLabel.configure(text = 'Tasks: %s' % tasksCount)
+        if tasksCount > 0:
+            self.SubmitButton.configure(state = 'normal')
+        else:
+            self.SubmitButton.configure(state = 'disabled')
 
 class JobSubmissionInterface(rb.RaccoonDefaultWidget):
     """ ask for Project, Exp, VS info..."""
@@ -390,7 +692,7 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
             p = self.getPrj()
             e = self.getExp()
             t = self.tag_entry.getvalue().strip()
-            self.jobdata = {'prj' : p, 'exp': e, 'tag':t} 
+            self.jobdata = {'prj' : p, 'exp': e, 'tag':t}
             self.win.deactivate(self.jobdata)
         else:
             self.win.deactivate(False)
@@ -424,8 +726,8 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
 
 
     def checkDuplicates(self):
-        """ check that the jobs that are going to be 
-            submitted do not have the same name of 
+        """ check that the jobs that are going to be
+            submitted do not have the same name of
             already submitted jobs
         """
         m = ('The submission cannot be performed because there '
@@ -514,7 +816,7 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
 
         tk.Label(w, text='Select the new VS properties', font=self.FONT).grid(row=0,column=1, sticky='we', columnspan=3,padx=5,pady=5)
         tk.Frame(w,height=2,bd=1,relief='sunken').grid(row=1, column=0, sticky='ew', columnspan=3, pady=3)
-        # project 
+        # project
         tk.Label(w, text='Project', font=self.FONTbold, width=12,anchor='e').grid(row=3,column=1,sticky='we')
         tk.Label(w, text='', font=self.FONT, width=10).grid(row=4,column=1,sticky='we',pady=5) # placeholder for entry
 
@@ -523,7 +825,7 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
                menubutton_font=self.FONT,
                menu_font=self.FONT,
                menubutton_bd = 1, menubutton_highlightbackground = 'black',
-               menubutton_borderwidth=1, menubutton_highlightcolor='black', 
+               menubutton_borderwidth=1, menubutton_highlightcolor='black',
                menubutton_highlightthickness = 1,
                menubutton_height=1,
                items = self.prj_list,
@@ -536,7 +838,7 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
 
         # --------------------------------
         tk.Frame(w,height=2,bd=1,relief='sunken').grid(row=6, column=0, sticky='ew', columnspan=3, pady=3)
-        
+
         # experiment
         tk.Label(w, text='Experiment', font=self.FONTbold, width=12,anchor='e').grid(row=7,column=1,sticky='we')
         tk.Label(w, text='', font=self.FONT, width=10).grid(row=8,column=1,sticky='we',pady=5) # placeholder for entry
@@ -546,7 +848,7 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
                        menubutton_font=self.FONT,
                        menu_font=self.FONT,
                menubutton_bd = 1, menubutton_highlightbackground = 'black',
-               menubutton_borderwidth=1, menubutton_highlightcolor='black', 
+               menubutton_borderwidth=1, menubutton_highlightcolor='black',
                menubutton_highlightthickness = 1,
                menubutton_height=1,
                        items=[self._new],
@@ -561,7 +863,7 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
 
         # --------------------------------
         tk.Frame(w,height=2,bd=1,relief='sunken').grid(row=9, column=0, sticky='ew', columnspan=3, pady=3)
-        # job tag 
+        # job tag
         tk.Label(w, text='Optional jobs name tag', font=self.FONT).grid(row=10, column=1,columnspan=3,sticky='we',padx=5)
         self.tag_entry = Pmw.EntryField(w, value='', validate = hf.validateAsciiEmpty) #,
         self.tag_entry.component('entry').configure(justify='left', font=self.FONT, bg='white',width=30, **self.BORDER)
@@ -594,8 +896,8 @@ class JobSubmissionInterface(rb.RaccoonDefaultWidget):
 
 
 class ManageJobOverlaps(rb.RaccoonDefaultWidget):
-    
-    
+
+
     def __init__(self, parent, duplicates):
         rb.RaccoonDefaultWidget.__init__(self, parent)
         self.count = count
@@ -627,7 +929,7 @@ class ManageJobOverlaps(rb.RaccoonDefaultWidget):
             llb.pack(side='left', anchor='w', expand='1', fill='both')
         self.dialog.activate(globalMode=1)
 
-        
+
     def execute(self, result):
         if result == 'Overwrite':
             t = 'Overwrite jobs'
@@ -645,4 +947,4 @@ class ManageJobOverlaps(rb.RaccoonDefaultWidget):
         elif result == 'Cancel':
             choice = 'cancel'
         self.dialog.deactivate(choice)
-            
+

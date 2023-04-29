@@ -336,11 +336,16 @@ class BoincService:
         try:
             context = ssl.create_default_context()
         except AttributeError:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-
-        f = urllib2.urlopen(request, context=context)
+            try:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+            except AttributeError:
+                context = None
+        if context is not None:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            f = urllib2.urlopen(request, context=context)
+        else:
+            f = urllib2.urlopen(request)
         reply = f.read()
 
         error_num, error_msg = self._check_for_error(reply)
